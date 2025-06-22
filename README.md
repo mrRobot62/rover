@@ -47,7 +47,7 @@ Ziel des Projektes ist ein autonomer Rover Roboter zu bauen, basierend auf ROS2 
 - ...
 
 # Aktuelle Herausforderungen & Schwierigkeiten
-- ROS2 param.yaml File wird nicht richtig an die Nodes übergeben und somit können Parameter von Nodes nicht ausgelesen werden
+-  ~~ROS2 param.yaml File wird nicht richtig an die Nodes übergeben und somit können Parameter von Nodes nicht ausgelesen werden~~
 - Bei Erststart, starten direkt die Antriebsräder :-O. Fehlerursache muss in der Firmware liegen oder im driver_controller_node.py der einen unsinnigen Befehl weiterleitet
 - Genereller Umgang mit Fehlern nicht oder nur ungenügend implementiert. Robustheit gegen Fehler noch nicht verfügbar
 - Konfiguration der Antriebseinheiten aktuell in der ESP32-Firmware fest hinterlegt, das hat den Nachteil, das wir grundsätzlich zwischen Rover 1 und Rover 2 zwei unterschiedliche FW kompilieren müssen. Idee: Konfiguration auslagern und die Grundkonfiguration z.B. einem ESP32 SPIFF File ablegen. 

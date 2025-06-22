@@ -1,4 +1,8 @@
+build/
+install/
+log/
+__pycache__/
 *.pyc
-build/*
-install/*
-log/*
+*.bak
+*.DS_Store
+*.tmp

@@ -23,7 +23,7 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='LunaX',
-    maintainer_email='deine@email.de',
+    maintainer_email='berndklein@gmx.de',
     description='Allrad-Rover Projekt mit ROS2',
     license='MIT',
     tests_require=['pytest'],

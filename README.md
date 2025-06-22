@@ -6,6 +6,12 @@ Arbeiten zur Verfügung
 **Robot-Rover Projekt** basierend auf ROS2 auf einem Raspberry PI4 oder PI5.
 Akuell arbeiten wir getrennt mit zwei Rover die beide zwar auf ROS2 basieren aber doch unterschiedlich konfiguriert sind
 
+## Historie
+| Version |   Datum    | Inhalt                                                                                                       |
+| :-----: | :--------: | ------------------------------------------------------------------------------------------------------------ |
+|   0.1   | 2025-06-22 | initialer upload, Rover fährt grundlegene ROS2 Struktur funktioniert, ESP32 FW ok, Gamepad F710 ok, LIDAR ok |
+|         |            |                                                                                                              |
+
 
 ## ROS2-HUMBLE
 Hardware: Raspberry PI4, 4GB RAM, SD-Card

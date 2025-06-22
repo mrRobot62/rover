@@ -1,0 +1,286 @@
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <Dynamixel2Arduino.h>
+#include "rover.h"
+#include "rover_utils.h"
+#include <Vector.h>
+#include <Ticker.h>
+
+#include <Arduino.h>
+
+Ticker taskTickerSteering;
+Ticker taskTickerVelocity;
+
+const unsigned long DXL_BAUDRATE = 1000000;
+const float DXL_PROTOCOL = 1.0;
+
+int store_elements[DXL_BROADCAST_ID - 1];
+typedef Vector<int> TDynaList;
+TDynaList dynaList(store_elements);
+char buffer[200];
+
+// Dynamixel-Objekt
+Dynamixel2Arduino dxl(DXL_SERIAL, DXL_DIR_PIN);
+
+// void scanDynamixels(TDynaList &list, uint8_t opMode = OP_POSITION);
+bool scanDynamixels();
+void setAllServosPosition();
+void setWheelSpeed(Dynamixel2Arduino *dxl, uint8_t id, uint16_t speed);
+// void testSetRoverVelocity(Dynamixel2Arduino *dxl);
+// void testSetRoverServo(Dynamixel2Arduino *dxl);
+// void testsetSetRoverSteering(Dynamixel2Arduino *dxl);
+
+// Wrapper-Funktion für Ticker (weil attach_ms keine Parameter unterstützt)
+std::function<void()> tastSteeringWrapper;
+std::function<void()> taskVelocityWrapper;
+
+int8_t dir = 1;
+int speed = -1023;
+int step = 50;
+int count = 1;
+
+#define MAX_SPEED ;
+
+/**
+ * @brief Testest die Funktion setRoverVelocity mit diversen Parametereinstellungen
+ */
+void taskVelocity(Dynamixel2Arduino *dxl)
+{
+
+  uint16_t speed = random(-600, 600);
+
+  float gain = (random(-100, 100) / 100.0);
+  gain = 0.0;
+  setRoverVelocity(dxl, speed, gain);
+  // Kurze Verzögerung, um die Effekte zu beobachten
+}
+
+void taskSteering(Dynamixel2Arduino *dxl)
+{
+
+  uint16_t speed = random(100, 500);
+  uint16_t pos = random(0, 1023);
+  uint8_t last_id;
+  uint16_t mapped_pos;
+  bool success;
+  DEBUG_SERIAL.printf("[%6d] ", millis());
+  for (auto &servo : steeringServos)
+  {
+    dxl->writeControlTableItem(ControlTableItem::MOVING, servo->id, speed);
+    DEBUG_SERIAL.printf("STEERING (%2d) - SET Moving (%3d) | ", servo->id, speed);
+  }
+  DEBUG_SERIAL.println();
+
+  DEBUG_SERIAL.printf("[%6d] ", millis());
+  for (auto &servo : steeringServos)
+  {
+
+    // Die Grenzwerte die eine Servo einnehmen kann sind durch CCW_ANGLE und CW_ANGLE definiert
+    // das heißt, wenn wir einen Wertebereich von 0-1023 an Winkel nutzen, müssen wir diesen wert auf
+    // den tatsächlichen möglichen Bereich mappen. Mitte bleibt aber 511
+    mapped_pos = map(pos, 0, 1023, servo->CW_ANGLE_LIMIT, servo->CCW_ANGLE_LIMIT);
+    success = dxl->setGoalPosition(servo->id, mapped_pos, UNIT_RAW);
+    DEBUG_SERIAL.printf("STEERING (%2d) - SET POS (%d) ok(%d) | ", servo->id, mapped_pos, success);
+    last_id = servo->id;
+    delay(5);
+  }
+  DEBUG_SERIAL.println();
+
+  // while (dxl->getPresentPosition(last_id) != mapped_pos)
+  // {
+  //   DEBUG_SERIAL.print("*");
+  // }
+  //  DEBUG_SERIAL.printf("All servos in place on pos (%d)", pos);
+}
+
+void setup()
+{
+  // Debug starten
+  DEBUG_SERIAL.begin(115200);
+  while (!DEBUG_SERIAL)
+    ;
+
+  delay(500); // warten um VSCode zeit zu geben den Monitor zu öffnen
+
+  // Dynamixel starten
+  DXL_SERIAL.begin(DXL_BAUDRATE, SERIAL_8N1, 16, 17);
+  dxl.begin(DXL_BAUDRATE);
+  dxl.setPortProtocolVersion(DXL_PROTOCOL);
+
+  delay(2000);
+
+  // Dynamixel-Scan
+  // alle gefundenen Servos erst einmal auf MODE: OP_POSTION setzen (Winkel 0-300Grad)
+  // scanDynamixels(dynaList, OP_POSITION);
+  if (!scanAllDynamixels(&dxl))
+  {
+    // DEBUG_SERIAL.println("SERVO-Liste falsch konfiguriert. Angegebene Servos nicht gefunden.");
+    while (true)
+    {
+      delay(1000);
+      DEBUG_SERIAL.print("ERROR ");
+    }
+  }
+
+  // vier Lenk-Servos erstellen
+  // ID=ServoID, Type=Steering oder Wheel, POS=VL(vorneLinks), ...
+  // CW=CW_ANGLE_LIMIT, CCW = CCW_ANGLE_LIMIT
+  // MID= Mittelposition
+  // START = Startposition - Rover fährt in gerader Linie
+
+  // vier Wheel-Servos erstellen
+  //                                        ID,Type,POS,CW,CCW,MID,START
+  velocityServos.add(createRoverServo(&dxl, 4, WHEEL, VL, 0, 0, 0, 0));
+  velocityServos.add(createRoverServo(&dxl, 11, WHEEL, VR, 0, 0, 0, 0));
+  velocityServos.add(createRoverServo(&dxl, 3, WHEEL, HL, 0, 0, 0, 0));
+  velocityServos.add(createRoverServo(&dxl, 1, WHEEL, HR, 0, 0, 0, 0));
+
+  // Lenk-Servos
+  //                                        ID,Type,POS,CW,CCW,MID,StartAngle, backward, forward, base_velo, TorqueOn
+  steeringServos.add(createRoverServo(&dxl, 8, STEERING, VL, 285, 673, 511, 356, 0, 1024, 200, true));  // ok
+  steeringServos.add(createRoverServo(&dxl, 7, STEERING, VR, 358, 746, 511, 675, 1024, 0, 200, true));  // ok
+  steeringServos.add(createRoverServo(&dxl, 17, STEERING, HL, 358, 746, 511, 675, 0, 1024, 200, true)); // ok
+  steeringServos.add(createRoverServo(&dxl, 18, STEERING, HR, 285, 673, 511, 356, 1024, 0, 200, true)); // ok
+
+  setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR);
+  DEBUG_SERIAL.println("Steering Servos in Startposition");
+
+  // // Wrappen der Funktionen mit std::bind, um Parameter zu übergeben
+  // tastSteeringWrapper = std::bind(taskSteering, &dxl); // Beispielwert für task1
+  // taskVelocityWrapper = std::bind(taskVelocity, &dxl); // Beispielwert für task2
+
+  // // Timer für Task 1 (3000 ms Intervall)
+  // taskTickerSteering.attach_ms(5000, []()
+  //                             { tastSteeringWrapper(); });
+
+  // // Timer für Task 2 (1000 ms Intervall)
+  // // taskTickerVelocity.attach_ms(4000, []() { taskVelocityWrapper(); });
+}
+
+void loop()
+{
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR);
+  // delay(2500);
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::TURN);
+  // delay(2500);
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR, 50);
+  // delay(2500);
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::TURN, 50);
+  // delay(2500);
+
+  // // Seitwärts
+  // setServosToSidway(&dxl, 50);
+  // delay(2500);
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR);
+  // delay(2500);
+  // setServosToSidway(&dxl, 500);
+  // delay(2500);
+
+  // Ackermann Steuerung
+  setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR, 80);
+  delay(2500);
+  setServoCurvature(&dxl, -1.0, 100);
+  delay(2500);
+  setServoCurvature(&dxl, 1.0, 100);
+  delay(2500);
+  // setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR, 80);
+  // delay(2500);
+  // setServoCurvature(&dxl, -0.50, 200);
+  // delay(2500);
+  // setServoCurvature(&dxl, -1.0, 200);
+  // delay(2500);
+  // // setServoCurvature(&dxl, 0.50, 100);
+  // // delay(2500);
+  // // setServoCurvature(&dxl, 1.0, 100);
+  // // delay(2500);
+}
+// /**
+//  * @brief Scannt die Dynamixel-Kette und sucht ob die definierten IDs auch verfügbar sind.
+//  * Wenn nein liefert die Funktion false zurück. Wurde ein Servo gefunden, wird auch direkt der
+//  * Mode für diesen Servo gesetzt. OP_VELOCITY (für Antriebsservos), OP_POSITION (für lenkservos)
+//  *
+//  */
+// bool scanDynamixels()
+// {
+//   size_t s = ARRAY_SIZE(dxl_ids_steering);
+//   bool found = true;
+//   for (uint8_t id = 0; id < s; id++)
+//   {
+//     // Steering Servos
+//     if (dxl_ids_steering[id][0] > 0 && dxl.ping(dxl_ids_steering[id][0]))
+//     {
+//       DEBUG_SERIAL.printf("STEERING-Servo ID:(%2d) MODE: (%d) MODEL:(%3d)\n",
+//                           dxl_ids_steering[id], OP_POSITION, dxl.getModelNumber(id));
+//       dxl.torqueOff(id); // Torque abschalten um den Mode zu setzen
+//       dxl.setOperatingMode(id, OP_POSITION);
+//       dxl.torqueOn(id); // Troque wieder aktivieren um den Servo nutzen zu können
+//     }
+//     else
+//     {
+//       if (dxl_ids_steering[id][0] == 0)
+//         DEBUG_SERIAL.printf("STEERING-Servo ID:(%2d) Servo not found - error - check dxl_ids_steering\n", dxl_ids_steering[id]);
+//       found = false;
+//       continue;
+//     }
+//     // Antriebsservos
+//     if (dxl_ids_velocity[id][0] > 0 && dxl.ping(dxl_ids_velocity[id][0]))
+//     {
+//       DEBUG_SERIAL.printf("VELOCITY-Servo ID:(%2d) MODE: (%d) MODEL:(%3d)\n",
+//                           dxl_ids_velocity[id][0], OP_VELOCITY, dxl.getModelNumber(id));
+//       dxl.torqueOff(id); // Torque abschalten um den Mode zu setzen
+//       dxl.setOperatingMode(id, OP_VELOCITY);
+//       dxl.torqueOn(id); // Troque wieder aktivieren um den Servo nutzen zu können
+//     }
+//     else
+//     {
+//       if (dxl_ids_velocity[id][0] == 0)
+//         continue;
+//       DEBUG_SERIAL.printf("VELOCITY-Servo ID:(%2d) Servo not found - error - check dxl_ids_velocity\n",
+//                           dxl_ids_velocity[id]);
+//       found = false;
+//     }
+//   }
+//   return found;
+// }
+
+/**
+ * @brief Testest die Funktion setRoverVelocity mit diversen Parametereinstellungen
+ */
+void testSetRoverVelocity2(Dynamixel2Arduino *dxl)
+{
+  uint16_t test_speeds[] = {100, 200, 400, 600, 800, 1023, 0};              // Verschiedene Geschwindigkeitsstufen
+  float test_gains[] = {0.0, 0.25, 0.5, 0.65, 1.0, -0.25, 0.5, 0.75, -1.0}; // Verstärkungs- und Dämpfungswerte
+  uint8_t test_dirs[] = {1, 0};                                             // Richtung: Vorwärts und Rückwärts
+
+  for (float gain : test_gains)
+  {
+    DEBUG_SERIAL.printf("(1) NEW GAIN => %2.1f \n", gain);
+    for (uint16_t speed : test_speeds)
+    {
+      DEBUG_SERIAL.printf("--(2) NEW SPEED => %4d \n", speed);
+
+      for (uint8_t dir : test_dirs)
+      {
+        DEBUG_SERIAL.printf("----(3) NEW dir SPEED(%4d) GAIN (%2.1f) DIR (%1d) \n", speed, gain, dir);
+        setRoverVelocity(dxl, speed, gain, dir);
+        delay(1000); // Kurze Verzögerung, um die Effekte zu beobachten
+      }
+    }
+  }
+}
+
+void _dumpServo(RoverServo *servo)
+{
+  DEBUG_SERIAL.printf("Servo (%3d), ServoType (%d) SPos (%d)\n",
+                      servo->id,
+                      servo->servo_type,
+                      servo->servo_position);
+}
+
+void testSetRoverServo(Dynamixel2Arduino *dxl)
+{
+  for (auto &vServo : velocityServos)
+  {
+    _dumpServo(vServo);
+  }
+}

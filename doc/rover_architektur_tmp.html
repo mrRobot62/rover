@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>rover_architektur.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="%F0%9F%A7%A0-rover-klassenmodell--architektur-ros-2">🧠 Rover-Klassenmodell &amp; Architektur (ROS 2)</h1>
+<p>Dieses Dokument beschreibt das strukturierte Klassen- und Komponentensystem für einen ROS 2-basierten Allrad-Rover mit I2C-gebundener Hardwaresteuerung. Der Aufbau ist in zwei Hauptbereiche gegliedert: ROS 2 Nodes (Kommunikation, Steuerung) und fachlich-technische Klassen (Hardware, Sensorik, Verarbeitung).</p>
+<h2 id="%F0%9F%93%98-inhaltsverzeichnis">📘 Inhaltsverzeichnis</h2>
+<ul>
+<li><a href="#-rover-klassenmodell--architektur-ros-2">🧠 Rover-Klassenmodell &amp; Architektur (ROS 2)</a>
+<ul>
+<li><a href="#-inhaltsverzeichnis">📘 Inhaltsverzeichnis</a></li>
+</ul>
+</li>
+<li><a href="#%EF%B8%8F-architekturmodell-rover-projekt-ros-2--3-schichten-modell">🏗️ Architekturmodell Rover-Projekt (ROS 2) – 3-Schichten-Modell</a>
+<ul>
+<li><a href="#1-node-schicht-ros-2-communication-layer">1. Node-Schicht (ROS 2 Communication Layer)</a>
+<ul>
+<li><a href="#aufgaben">Aufgaben:</a></li>
+<li><a href="#beispiele">Beispiele:</a></li>
+</ul>
+</li>
+<li><a href="#2-control-schicht-logik--steuerung--verarbeitung">2. Control-Schicht (Logik / Steuerung / Verarbeitung)</a>
+<ul>
+<li><a href="#aufgaben-1">Aufgaben:</a></li>
+<li><a href="#beispiele-1">Beispiele:</a></li>
+</ul>
+</li>
+<li><a href="#3-hardware-schicht-treiber--i2c-kommunikation">3. Hardware-Schicht (Treiber / I2C Kommunikation)</a>
+<ul>
+<li><a href="#aufgaben-2">Aufgaben:</a></li>
+<li><a href="#beispiele-2">Beispiele:</a></li>
+</ul>
+</li>
+<li><a href="#visualisierung">Visualisierung</a></li>
+<li><a href="#vorteile-dieser-architektur">Vorteile dieser Architektur</a></li>
+</ul>
+</li>
+<li><a href="#-komponentendiagramm">🧩 Komponentendiagramm</a>
+<ul>
+<li><a href="#legende">Legende:</a></li>
+<li><a href="#-ros2-node---schicht-ros-spezifisch-verwenden-rclpy">🧩 ROS2 Node - Schicht (ROS-spezifisch, verwenden <code>rclpy</code>)</a>
+<ul>
+<li><a href="#sensornode-lidar--ultraschall--kamera"><code>SensorNode</code> (Lidar / Ultraschall / Kamera)</a>
+<ul>
+<li><a href="#publisher">Publisher</a></li>
+<li><a href="#subscriber">Subscriber</a></li>
+</ul>
+</li>
+<li><a href="#odomnode">OdomNode</a>
+<ul>
+<li><a href="#publisher-1">Publisher</a></li>
+<li><a href="#subscriber-1">Subscriber</a></li>
+</ul>
+</li>
+<li><a href="#manualcontrolnode-drivecontrollernode">ManualControlNode (DriveControllerNode)</a>
+<ul>
+<li><a href="#publisher-2">Publisher</a></li>
+<li><a href="#subscriber-2">Subscriber</a></li>
+</ul>
+</li>
+<li><a href="#drivecontrollernode">DriveControllerNode</a></li>
+<li><a href="#navigationnode">NavigationNode</a></li>
+</ul>
+</li>
+<li><a href="#navigationnode-1">NavigationNode</a>
+<ul>
+<li><a href="#publisher-3">Publisher</a></li>
+<li><a href="#subscriber-3">Subscriber</a></li>
+<li><a href="#visionnode-zuk%C3%BCnftig">VisionNode (zukünftig)</a>
+<ul>
+<li><a href="#publisher-4">Publisher</a></li>
+<li><a href="#subscriber-4">Subscriber</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#-1-klassenmodell-strukturier--te-gliederung">📦 1. Klassenmodell (strukturier- te Gliederung)</a>
+<ul>
+<li><a href="#motordriver">MotorDriver</a></li>
+<li><a href="#steeringcontroller">SteeringController</a></li>
+<li><a href="#kinematicsmodel">KinematicsModel</a></li>
+<li><a href="#sensorinterface">SensorInterface</a></li>
+<li><a href="#lidarsensor-ultrasoundsensor-camerasensor">LidarSensor, UltrasoundSensor, CameraSensor</a></li>
+<li><a href="#imageprocessor-zuk%C3%BCnftig"><code>ImageProcessor</code> (zukünftig)</a></li>
+<li><a href="#obstacledetector"><code>ObstacleDetector</code></a></li>
+<li><a href="#hardwarenahe-klassen">Hardwarenahe Klassen</a></li>
+</ul>
+</li>
+<li><a href="#-hinweise-zur-erweiterbarkeit">📎 Hinweise zur Erweiterbarkeit</a></li>
+</ul>
+</li>
+</ul>
+<hr>
+<h1 id="%F0%9F%8F%97%EF%B8%8F-architekturmodell-rover-projekt-ros-2-%E2%80%93-3-schichten-modell">🏗️ Architekturmodell Rover-Projekt (ROS 2) – 3-Schichten-Modell</h1>
+<p>Dieses Dokument beschreibt die geplante Software-Architektur für dein ROS 2 Rover-Projekt.
+Das Modell orientiert sich an einer klaren Schichtenarchitektur mit Trennung von Kommunikation, Fachlogik und Hardwarezugriff.</p>
+<hr>
+<h2 id="1-node-schicht-ros-2-communication-layer">1. Node-Schicht (ROS 2 Communication Layer)</h2>
+<h3 id="aufgaben">Aufgaben:</h3>
+<ul>
+<li>Implementierung aller ROS 2 Nodes</li>
+<li>Verarbeiten und Weiterreichen von ROS-Messages (Publisher, Subscriber, Actions, Services)</li>
+<li>Kein direkter Hardwarezugriff!</li>
+<li>Abhängig von <code>rclpy</code>, ROS-Interfaces und Topics</li>
+</ul>
+<h3 id="beispiele">Beispiele:</h3>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Aufgabe</th>
+<th>Typ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>manual_control_node</code></td>
+<td>Empfängt <code>/cmd_vel</code> und delegiert an Controller</td>
+<td>Subscriber</td>
+</tr>
+<tr>
+<td><code>sensor_node</code></td>
+<td>Publiziert Sensordaten (LiDAR, Ultraschall, Kamera)</td>
+<td>Publisher</td>
+</tr>
+<tr>
+<td><code>odom_node</code></td>
+<td>Berechnet und publiziert Odometrie</td>
+<td>Publisher</td>
+</tr>
+<tr>
+<td><code>navigation_node</code></td>
+<td>Verwaltet SLAM, Navigation und Pathfinding</td>
+<td>Action-Client</td>
+</tr>
+<tr>
+<td><code>vision_node</code></td>
+<td>Führt Bildverarbeitung aus</td>
+<td>Publisher / Service</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-control-schicht-logik--steuerung--verarbeitung">2. Control-Schicht (Logik / Steuerung / Verarbeitung)</h2>
+<h3 id="aufgaben">Aufgaben:</h3>
+<ul>
+<li>Fachlogik: Berechnungen, Steuerstrategien</li>
+<li>Hardware-unabhängig</li>
+<li>Transformation von Steuerwerten in Zielgrößen für Aktoren</li>
+<li>Implementierung von Kinematik, Odometrie, Bildverarbeitung</li>
+</ul>
+<h3 id="beispiele">Beispiele:</h3>
+<table>
+<thead>
+<tr>
+<th>Klasse</th>
+<th>Aufgabe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KinematicsModel</code></td>
+<td>Umrechnung Twist &lt;-&gt; Radgeschwindigkeiten</td>
+</tr>
+<tr>
+<td><code>ObstacleDetector</code></td>
+<td>Fusion von Sensorwerten zu Hindernisinformation</td>
+</tr>
+<tr>
+<td><code>ImageProcessor</code></td>
+<td>Bildverarbeitung (z.B. Objekterkennung)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-hardware-schicht-treiber--i2c-kommunikation">3. Hardware-Schicht (Treiber / I2C Kommunikation)</h2>
+<h3 id="aufgaben">Aufgaben:</h3>
+<ul>
+<li>Abstraktion und Zugriff auf Hardware über definierte Schnittstellen</li>
+<li>Nutzung von I2C, UART, SPI oder direkter Bibliotheken</li>
+<li>Versenden fertiger Steuerwerte an Motorcontroller, Servos, Sensoren</li>
+</ul>
+<h3 id="beispiele">Beispiele:</h3>
+<table>
+<thead>
+<tr>
+<th>Klasse</th>
+<th>Aufgabe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ServoDriver</code></td>
+<td>Gemeinsame I2C-Basisklasse</td>
+</tr>
+<tr>
+<td><code>VelocityController</code></td>
+<td>Steuerung der Antriebseinheiten (via I2C)</td>
+</tr>
+<tr>
+<td><code>SteeringController</code></td>
+<td>Steuerung der Lenkservos (via I2C)</td>
+</tr>
+<tr>
+<td><code>LidarSensor</code></td>
+<td>Rohdatenempfang und Verarbeitung vom LiDAR</td>
+</tr>
+<tr>
+<td><code>UltrasoundSensor</code></td>
+<td>Triggern und Messen per Ultraschall</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="visualisierung">Visualisierung</h2>
+<pre class="hljs"><code><div>+---------------------------+
+|      ROS 2 Node-Schicht   |  &lt;-- rclpy, ROS2 Messages
++---------------------------+
+| Control-Schicht           |  &lt;-- Fachlogik, Verarbeitung
++---------------------------+
+| Hardware-Schicht          |  &lt;-- I2C / Treiber / Sensor-Access
++---------------------------+
+</div></code></pre>
+<hr>
+<h2 id="vorteile-dieser-architektur">Vorteile dieser Architektur</h2>
+<table>
+<thead>
+<tr>
+<th>Vorteil</th>
+<th>Nutzen</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trennung von ROS 2 Abhängigkeiten</td>
+<td>Austauschbar, testbar, isoliert</td>
+</tr>
+<tr>
+<td>Klare Verantwortlichkeiten</td>
+<td>Nodes = Kommunikation / Control = Logik / Hardware = Zugriff</td>
+</tr>
+<tr>
+<td>Zukünftig erweiterbar</td>
+<td>Sensoren, Motoren, weitere Aktoren einfach ergänzbar</td>
+</tr>
+<tr>
+<td>Perfekt für Unit-Tests</td>
+<td>Control- und Hardwareklassen einzeln testbar</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p>Erstellt für das Allrad-gelenkte ROS 2 Rover-Projekt mit modularer Schichtenarchitektur.</p>
+<h1 id="%F0%9F%A7%A9-komponentendiagramm">🧩 Komponentendiagramm</h1>
+<pre><code class="language-mermaid"><div class="mermaid">flowchart TD
+
+%% ROS 2 Nodes
+subgraph ROS2_Nodes
+    A1[<b><i>Teleop / Gamepad</i></b><br><b>PUB</b>:<i>/cmd_vel</i>]
+    A2[<b><i>manual_control_node</i></b><br><b>SUB</b>:<i>/cmd_vel</i><br><b>PUB</b>:<i>/status/drive</i>]
+    A3[<b><i>sensor_node</i></b><br><b>PUB</b>:<i>/scan</i><br><b>PUB</b>:<i>/ultrasound</i><br><b>PUB</b>:<i>/camera/image_raw</i><br><b>PUB</b>:<i>/imu/data</i><br><b>PUB</b>:<i>/battery_state</i>]
+    A4[<b><i>odom_node</i></b><br><b>SUB</b>:<i>/imu/data</i><br><b>PUB</b>:<i>/odom</i>]
+    A5[<b><i>navigation_node</i></b><br><b>SUB</b>:<i>/odom</i><br><b>SUB</b>:<i>/scan</i><br><b>SUB</b>:<i>/ultrasound</i><br><b>SUB</b>:<i>/vision/obstacles</i><br><b>PUB</b>:<i>/plan</i><br><b>PUB</b>:<i>/cmd_vel</i>]
+    A6[<b><i>vision_node</i></b><br><b>SUB</b>:<i>/camera/image_raw</i><br><b>PUB</b>:<i>/vision/obstacles</i>]
+end
+
+%% Hardware-Controller
+subgraph Hardware
+    B1[<b><i>VelocityController</i></b><br>I2C]
+    B2[<b><i>SteeringController</i></b><br>I2C]
+end
+
+%% Sensoren
+subgraph Sensors
+    S1[<i>LidarSensor</i>]
+    S2[<i>UltrasoundSensor</i>]
+    S3[<i>CameraSensor</i>]
+    S4[<i>IMU / Encoder</i>]
+end
+
+%% Steuerlogik
+subgraph Control
+    C1[<i>KinematicsModel</i>]
+    C2[<i>ObstacleDetector</i>]
+    C3[<i>ImageProcessor</i>]
+end
+
+%% Topic-Flows
+A1 -->|<b>PUB</b>:<i>/cmd_vel</i>| A2
+A2 -->|I2C| B1
+A2 -->|I2C| B2
+A3 -->|<b>PUB</b>:<i>/scan</i>| A5
+A3 -->|<b>PUB</b>:<i>/ultrasound</i>| A5
+A3 -->|<b>PUB</b>:<i>/camera/image_raw</i>| A6
+A3 -->|<b>PUB</b>:<i>/imu/data</i>| A4
+A4 -->|<b>PUB</b>:<i>/odom</i>| A5
+A5 -->|<b>PUB</b>:<i>/cmd_vel</i>| A2
+A6 -->|<b>PUB</b>:<i>/vision/obstacles</i>| A5
+
+%% SensorNode intern
+A3 --> S1
+A3 --> S2
+A3 --> S3
+A3 --> S4
+
+%% Control intern
+A6 --> C3
+C3 --> C2
+A3 --> C2
+S1 --> C2
+S2 --> C2
+S3 --> C2
+</div></code></pre>
+<h2 id="legende">Legende:</h2>
+<ul>
+<li>ROS2 Nodes = Kommunikationsebene</li>
+<li>Hardware = I2C Controller</li>
+<li>Sensors = Physische Sensoren</li>
+<li>Control = Fachlogik &amp; Verarbeitung</li>
+<li>Topics = ROS 2 Kommunikation (Publisher / Subscriber)</li>
+<li>I2C = Steuerung Richtung ESP32 (Velocity / Steering)</li>
+<li>PUB = published Topic</li>
+<li>SUB = subscribe Topic</li>
+</ul>
+<hr>
+<h2 id="%F0%9F%A7%A9-ros2-node---schicht-ros-spezifisch-verwenden-rclpy">🧩 ROS2 Node - Schicht (ROS-spezifisch, verwenden <code>rclpy</code>)</h2>
+<h3 id="sensornode-lidar--ultraschall--kamera"><code>SensorNode</code> (Lidar / Ultraschall / Kamera)</h3>
+<ul>
+<li><strong>Verantwortungsbereich</strong>
+<ul>
+<li>Zentrale Erfassung aller Sensordaten des Rovers.</li>
+<li>Initialisiert und betreibt alle physischen Sensoren.</li>
+<li>Publiziert Rohdaten in ROS Topics.</li>
+</ul>
+</li>
+</ul>
+<h4 id="publisher">Publisher</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/scan</code></td>
+<td><code>sensor_msgs/LaserScan</code></td>
+<td>LiDAR Scan-Daten</td>
+</tr>
+<tr>
+<td><code>/ultrasound</code></td>
+<td><code>sensor_msgs/Range</code></td>
+<td>Ultraschall Messwerte</td>
+</tr>
+<tr>
+<td><code>/camera/image_raw</code></td>
+<td><code>sensor_msgs/Image</code></td>
+<td>Kamerabild</td>
+</tr>
+<tr>
+<td><code>/imu/data</code></td>
+<td><code>sensor_msgs/Imu</code></td>
+<td>IMU Bewegungsdaten</td>
+</tr>
+<tr>
+<td><code>/battery_state</code></td>
+<td><code>sensor_msgs/BatteryState</code></td>
+<td>Akkustatus</td>
+</tr>
+</tbody>
+</table>
+<h4 id="subscriber">Subscriber</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td>—</td>
+<td>SensorNode empfängt keine externen Topics</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="odomnode">OdomNode</h3>
+<ul>
+<li><strong>Verantwortung</strong>:
+<ul>
+<li>Berechnet und veröffentlicht die Odometrie des Roboters.</li>
+<li>Nutzt Encoderwerte und evtl. IMU-Daten zur Positionsbestimmung.</li>
+<li>Dient als Basis für die Navigation.</li>
+</ul>
+</li>
+</ul>
+<h4 id="publisher">Publisher</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/odom</code></td>
+<td><code>nav_msgs/Odometry</code></td>
+<td>Berechnete Odometrie</td>
+</tr>
+</tbody>
+</table>
+<h4 id="subscriber">Subscriber</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/imu/data</code></td>
+<td><code>sensor_msgs/Imu</code></td>
+<td>IMU Daten für Odometrie</td>
+</tr>
+<tr>
+<td>Encoder Daten über I2C</td>
+<td>intern oder Custom Msg</td>
+<td>Motor-Daten zur Odometrie</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="manualcontrolnode-drivecontrollernode">ManualControlNode (DriveControllerNode)</h3>
+<ul>
+<li><strong>Verantwortung</strong>:
+<ul>
+<li>Entgegennahme von Fahrbefehlen (<code>/cmd_vel</code>).</li>
+<li>Umsetzung von Geschwindigkeit und Lenkkrümmung.</li>
+<li>Ansteuerung des MotorDriver und SteeringController via I2C.</li>
+</ul>
+</li>
+</ul>
+<h4 id="publisher">Publisher</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/status/drive</code></td>
+<td>Custom oder <code>std_msgs</code></td>
+<td>Aktueller Fahrstatus</td>
+</tr>
+</tbody>
+</table>
+<h4 id="subscriber">Subscriber</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/cmd_vel</code></td>
+<td><code>geometry_msgs/Twist</code></td>
+<td>Fahrbefehle vom Gamepad / Teleop</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="drivecontrollernode">DriveControllerNode</h3>
+<ul>
+<li>
+<p><strong>Verantwortung</strong>:</p>
+</li>
+<li>
+<p><strong>Verantwortung</strong>: Empfang von Velocity-Commands, Umsetzung in Servopositionen und Motorwerte.</p>
+</li>
+<li>
+<p><strong>TOPIC</strong>:</p>
+<ul>
+<li><code>/cmd_vel</code> (geometry_msgs/Twist)</li>
+<li><code>/status/drive</code> (z. B. Feedback über Ist-Werte)</li>
+</ul>
+</li>
+</ul>
+<h3 id="navigationnode">NavigationNode</h3>
+<ul>
+<li><strong>Verantwortung</strong>: Steuerung der SLAM- und Navigationsprozesse.</li>
+<li><strong>Verantwortung</strong>:</li>
+</ul>
+<h2 id="navigationnode">NavigationNode</h2>
+<ul>
+<li><strong>Verantwortung</strong>:
+<ul>
+<li>Globale Pfadplanung und Navigation zum Ziel.</li>
+<li>Lokale Kollisionsvermeidung.</li>
+<li>Nutzung von SLAM und Kartendaten.</li>
+</ul>
+</li>
+<li></li>
+</ul>
+<h4 id="publisher">Publisher</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/plan</code></td>
+<td><code>nav_msgs/Path</code></td>
+<td>Geplanter Pfad</td>
+</tr>
+<tr>
+<td><code>/cmd_vel</code></td>
+<td><code>geometry_msgs/Twist</code></td>
+<td>Generierte Bewegungsbefehle an DriveControllerNode</td>
+</tr>
+</tbody>
+</table>
+<h4 id="subscriber">Subscriber</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/odom</code></td>
+<td><code>nav_msgs/Odometry</code></td>
+<td>Odometrie-Daten</td>
+</tr>
+<tr>
+<td><code>/scan</code></td>
+<td><code>sensor_msgs/LaserScan</code></td>
+<td>LiDAR-Umgebungsdaten</td>
+</tr>
+<tr>
+<td><code>/ultrasound</code></td>
+<td><code>sensor_msgs/Range</code></td>
+<td>Zusatz Hindernisinformationen</td>
+</tr>
+<tr>
+<td><code>/vision/obstacles</code></td>
+<td>Custom Msg</td>
+<td>Hindernisse aus Bildverarbeitung</td>
+</tr>
+</tbody>
+</table>
+<h3 id="visionnode-zuk%C3%BCnftig">VisionNode (zukünftig)</h3>
+<p><strong>Verantwortung</strong>: Bildverarbeitung (Obstacle Detection, Objekterkennung)</p>
+<ul>
+<li><strong>Verantwortung</strong>:
+<ul>
+<li>Bildverarbeitung zur Objekterkennung und Hindernisvermeidung.</li>
+<li>Fusion von Bilddaten mit anderen Sensorquellen.</li>
+<li>Publikation erkannter Hindernisse.</li>
+</ul>
+</li>
+</ul>
+<h4 id="publisher">Publisher</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/vision/obstacles</code></td>
+<td>Custom Msg</td>
+<td>Hindernisse / erkannte Objekte aus Bildverarbeitung</td>
+</tr>
+</tbody>
+</table>
+<h4 id="subscriber">Subscriber</h4>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Msg Type</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/camera/image_raw</code></td>
+<td><code>sensor_msgs/Image</code></td>
+<td>Rohdaten der Kamera</td>
+</tr>
+</tbody>
+</table>
+<h2 id="%F0%9F%93%A6-1-klassenmodell-strukturier--te-gliederung">📦 1. Klassenmodell (strukturier- te Gliederung)</h2>
+<pre><code class="language-mermaid"><div class="mermaid">classDiagram
+    class ServoDriver {
+        - bus
+        - address
+        + _send_packet(data)
+    }
+
+    class VelocityController {
+        + set_velocity(speed)
+    }
+
+    class SteeringController {
+        + set_curvature(curve)
+    }
+
+    class KinematicsModel {
+        - wheelbase
+        - track_width
+        + twist_to_wheel()
+        + update_odometry()
+    }
+
+    class SensorInterface {
+        <<abstract>>
+        + read_data()
+    }
+
+    SensorInterface <|-- LidarSensor
+    SensorInterface <|-- UltrasoundSensor
+    SensorInterface <|-- CameraSensor
+
+    class LidarSensor {
+        + read_data()
+        + parse_packet()
+    }
+
+    class UltrasoundSensor {
+        + read_data()
+    }
+
+    class CameraSensor {
+        + capture_frame()
+        + get_image()
+    }
+
+    class ObstacleDetector {
+        + update_from_lidar()
+        + update_from_camera()
+        + detect()
+    }
+
+    class ImageProcessor {
+        + detect_edges()
+        + detect_objects()
+    }
+
+    ServoDriver <|-- VelocityController
+    ServoDriver <|-- SteeringController
+</div></code></pre>
+<hr>
+<p>⸻</p>
+<h3 id="motordriver">MotorDriver</h3>
+<ul>
+<li>Hardwaresteuerung, z. B. I2C/UART-Kommunikation mit Motorcontroller</li>
+</ul>
+<h3 id="steeringcontroller">SteeringController</h3>
+<ul>
+<li>Umrechnung von Krümmung in Servo-RAW-Werte</li>
+<li>Unterstützt Allradlenkung (inkl. max/min Winkel etc.)</li>
+</ul>
+<h3 id="kinematicsmodel">KinematicsModel</h3>
+<ul>
+<li>Berechnung der Fahrkinematik</li>
+<li>Umkehrkinematik für Odometrie</li>
+</ul>
+<h3 id="sensorinterface">SensorInterface</h3>
+<ul>
+<li>Abstrakte Basisklasse für Sensoren (Lidar, Ultraschall, Kamera)</li>
+</ul>
+<h3 id="lidarsensor-ultrasoundsensor-camerasensor">LidarSensor, UltrasoundSensor, CameraSensor</h3>
+<ul>
+<li>Spezifische Implementierungen</li>
+<li>Parsen von Rohdaten, ggf. Filterung</li>
+</ul>
+<h3 id="imageprocessor-zuk%C3%BCnftig"><code>ImageProcessor</code> (zukünftig)</h3>
+<ul>
+<li>Führt Bildverarbeitung durch, z. B.:
+<ul>
+<li>Objekterkennung (ML)</li>
+<li>Linienverfolgung</li>
+<li>Kantenerkennung</li>
+</ul>
+</li>
+</ul>
+<h3 id="obstacledetector"><code>ObstacleDetector</code></h3>
+<ul>
+<li>Fusioniert Sensordaten von LiDAR, Kamera und Ultraschall</li>
+<li>Erkennt Hindernisse und gibt Zonen oder Objektlisten aus</li>
+</ul>
+<hr>
+<h3 id="hardwarenahe-klassen">Hardwarenahe Klassen</h3>
+<ul>
+<li><code>ServoDriver</code>: Basisklasse für alle I2C-basierten Hardwaremodule</li>
+<li><code>VelocityController</code>: Ableitung von <code>ServoDriver</code>, für Antrieb</li>
+<li><code>SteeringController</code>: Ableitung von <code>ServoDriver</code>, für Lenkung</li>
+<li>Diese Klassen verwenden JSON über I2C zur Kommunikation mit dem ESP32</li>
+</ul>
+<hr>
+<h2 id="%F0%9F%93%8E-hinweise-zur-erweiterbarkeit">📎 Hinweise zur Erweiterbarkeit</h2>
+<ul>
+<li>Die Architektur erlaubt einfache Erweiterung durch neue Sensoren oder Steuerkomponenten.</li>
+<li>Neue Nodes (z. B. Missionssteuerung, Autonomes Fahren) können nahtlos integriert werden.</li>
+<li>Eine Trennung von ROS-spezifischem Code und technischer Steuerlogik erhöht die Testbarkeit und Wartbarkeit.</li>
+</ul>
+<hr>
+<p>Erstellt für das Projekt eines Allrad-gelenkten ROS 2 Rovers mit modularer Hardwarearchitektur.</p>
+
+</body>
+</html>

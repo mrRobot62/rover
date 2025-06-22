@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"name": "esp32_rover",
+			"path": "."
+		}
+	],
+	"settings": {
+		"workbench.colorTheme": "Default Dark Modern",
+		"files.associations": {
+			"*.cpp__20250419": "cpp"
+		}
+	}
+}

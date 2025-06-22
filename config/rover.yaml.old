@@ -1,0 +1,66 @@
+#------------------------------------------------------
+# allgemeine Parameter die von allen Nodes genutzt
+# werden können.
+#------------------------------------------------------
+rover:
+  # ---- LEDs am rover
+  # GPIO Pins so definieren, wie sie im ESP32 genutzt werden
+  led_pin_turn_indicator: 18
+  led_pin_lights: 19
+  led_pin_break_light: 20
+
+  # ---- Eingangs-Pins am EPS32
+  #
+  pin_in_ultrasonic: 21
+
+
+odom_node:
+  ros__parameters:
+    some_setting: true
+    speed: 0.5
+    angle: 30
+
+sensor_node:
+  ros__parameters:
+    some_setting: true
+
+
+#------------------------------------------------------
+# der verwendete Lidar soll generisch eingebunden werden
+# Default lidar_model:=ydlidar
+#         lidar_model:=xv11 (Alternativ)
+#------------------------------------------------------
+ydlidar:
+  ros__parameters:
+    port: "/dev/ttyUSB0"
+    baudrate: 230400
+    frame_id: "laser_frame"
+    lidar_topic: "/scan"
+    model: "T-mini Plus"
+    # diese Launch nutzt TransformNodes
+    #ydlidar_launch: "full_lidar.launch.py"
+
+    # diese Launch nutzt keine Transform (T2) Nodes !
+    ydlidar_launch: "only_lidar_driver.launch.py"
+    ydlidar_param: "TminiPro.yaml"
+
+xv11:
+  ros__parameters:
+    port: "/dev/ttyUSB1"
+    frame_id: "laser_frame"
+    lidar_topic: "/scan"
+    scan_rate_hz: 5
+
+#------------------------------------------------------
+# Gamepad-Controller
+#------------------------------------------------------
+driver_controller_node:
+  ros__parameters:
+    cmd_vel_topic: "/joy"
+    log_level: INFO
+    reverse_steering: true
+    reverse_velocity: false
+    # Joystick mappings
+    map_js_steering: 0     # LJ_LR (Wert aus ENUM JOYSTICKS)
+    map_js_velocity: 1     # LJ_UD
+    map_js_cam_lr: 2

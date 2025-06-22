@@ -1,0 +1,390 @@
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <Dynamixel2Arduino.h>
+#include "rover.h"
+#include "rover_utils.h"
+#include <Vector.h>
+#include <Ticker.h>
+
+#include <Arduino.h>
+#include <Wire.h>
+#include <ArduinoJson.h>
+#include "i2c_helper.h"
+
+// I2C Konfiguration
+// Default-Werte
+#define DEFAULT_I2C_PORT I2C_NUM_0
+#define DEFAULT_I2C_SDA 21
+#define DEFAULT_I2C_SCL 22
+#define DEFAULT_I2C_ADDR 0x12
+#define DEFAULT_I2C_BUF_SIZE 512
+
+// JSON Buffer
+StaticJsonDocument<256> jsonDocRx;
+StaticJsonDocument<256> jsonDocTx;
+
+char rxBuffer[DEFAULT_I2C_BUF_SIZE];
+char txBuffer[DEFAULT_I2C_BUF_SIZE];
+
+const unsigned long DXL_BAUDRATE = 1000000;
+const float DXL_PROTOCOL = 1.0;
+
+int store_elements[DXL_BROADCAST_ID - 1];
+typedef Vector<int> TDynaList;
+TDynaList dynaList(store_elements);
+char buffer[200];
+
+// Dynamixel-Objekt
+Dynamixel2Arduino dxl(DXL_SERIAL, DXL_DIR_PIN);
+
+// -----------------------------
+// Command-IDs per Enum
+// -----------------------------
+enum CommandID : uint8_t
+{
+    CMD_NONE = 0,
+    CMD_WRITE_SERVO_DRIVE,
+    CMD_WRITE_CONFIG,
+    CMD_READ_SERVO_STATE,
+    CMD_READ_SYSTEM_INFO,
+    CMD_READ_IMU_DATA,
+    CMD_MAX // nicht entfernen, muss das letzte Element sein, steht für die Größe des Arrays
+};
+
+// Callback-Funktionstyp
+// typedef void (*CommandCallback)();
+// Callback-Typen
+typedef void (*WriteCallback)(JsonDocument &doc);
+typedef void (*ReadCallback)(JsonDocument &doc);
+// Callback-Arrays
+WriteCallback writeCallbacks[CMD_MAX];
+ReadCallback readCallbacks[CMD_MAX];
+
+// -----------------------------
+// CRC8 Dallas/Maxim
+// -----------------------------
+uint8_t calcCRC8(const uint8_t *data, size_t len)
+{
+    uint8_t crc = 0x00;
+    for (size_t i = 0; i < len; i++)
+    {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; j++)
+        {
+            crc = (crc & 0x80) ? (crc << 1) ^ 0x31 : (crc << 1);
+        }
+    }
+    return crc;
+}
+
+// -----------------------------
+// WRITE callback Funktionen
+// -----------------------------
+/**
+ *
+ */
+void cmdWriteServoDrive(JsonDocument &doc)
+{
+    JsonArray dyna = doc["dx"];
+    JsonArray data = doc["i"];
+    int dynaVal[4] = {0};
+    int dataVal[4] = {0};
+
+    DEBUG_SERIAL.printf("dyna [");
+    for (int i = 0; i < 4; i++)
+    {
+        dynaVal[i] = dyna[i] | 0;
+        DEBUG_SERIAL.printf("%d,", dynaVal[i]);
+    }
+    DEBUG_SERIAL.printf("]\n");
+    DEBUG_SERIAL.printf("data [");
+
+    for (int i = 0; i < 4; i++)
+    {
+        dataVal[i] = data[i] | 0;
+        DEBUG_SERIAL.printf("%d,", dataVal[i]);
+    }
+    DEBUG_SERIAL.printf("]\n");
+
+    float speed = float(dynaVal[0] / 100.0);
+    float curve = float(dynaVal[1] / 100.0);
+    DEBUG_SERIAL.printf("[cmdWriteServoDrive] Speed: %3.2f; Curve: %3.2f \n", speed, curve);
+    setRoverVelocity(&dxl, speed);
+    setServoCurvature(&dxl, curve);
+}
+
+/**
+ *
+ */
+void cmdWriteConfig(JsonDocument &doc)
+{
+    DEBUG_SERIAL.printf("[cmdWriteConfig] => not implemented yet \n");
+
+    DEBUG_SERIAL.printf("[cmdWriteConfig]  \n");
+}
+
+//-------------------------------------------------------------
+// Write-Command Dispatcher
+//
+// WRITE sind befehle die vom Host gesendet werden um auf dem ESP etwas auszuführen
+// z.B. Servo-Bewegungen, ....
+//-------------------------------------------------------------
+void handleWriteCommand(uint8_t cmd)
+{
+    if (cmd < CMD_MAX && writeCallbacks[cmd])
+    {
+        writeCallbacks[cmd](jsonDocRx);
+    }
+}
+
+//-------------------------------------------------------------
+// Read callbacks
+//-------------------------------------------------------------
+
+/**
+ *
+ */
+void cmdReadSystemInfo(JsonDocument &doc)
+{
+    DEBUG_SERIAL.printf("[cmdWriteConfig] => not implemented yet \n");
+    DEBUG_SERIAL.printf("[cmdReadSystemInfo]  \n");
+}
+
+/**
+ *
+ */
+void cmdReadServoState(JsonDocument &doc)
+{
+    DEBUG_SERIAL.printf("[cmdReadServoState] => not implemented yet \n");
+    DEBUG_SERIAL.printf("[cmdReadServoState]  \n");
+}
+
+/**
+ *
+ */
+void cmdReadIMUData(JsonDocument &doc)
+{
+    DEBUG_SERIAL.printf("[cmdReadIMUData] => not implemented yet \n");
+    DEBUG_SERIAL.printf("[cmdReadIMUData]  \n");
+}
+
+//-------------------------------------------------------------
+// Read-Command Verarbeitung
+// Antwort: { "r":cmd, "l":N, "d":[..] }
+//-------------------------------------------------------------
+void handleReadCommand(uint8_t cmd)
+{
+    size_t len = 0;
+    if (cmd < CMD_MAX && readCallbacks[cmd])
+    {
+        readCallbacks[cmd](jsonDocRx);
+    }
+    else
+    {
+        // Default Antwort
+        jsonDocTx.clear();
+        jsonDocTx["r"] = cmd;
+        JsonArray data = jsonDocTx.createNestedArray("d");
+        data.add(42);
+        jsonDocTx["l"] = data.size();
+
+        len = serializeJson(jsonDocTx, txBuffer, sizeof(txBuffer));
+        Wire.write((uint8_t *)txBuffer, len);
+    }
+    DEBUG_SERIAL.printf("[handleReadCommand] cmd: %d, bytes send: %d\n", cmd, len);
+}
+
+//-------------------------------------------------------------
+// I2C Receive Event
+//-------------------------------------------------------------
+void receiveEvent(int len)
+{
+    DEBUG_SERIAL.printf("receiveEvent - DataSize: %d", len);
+
+    if (len >= DEFAULT_I2C_BUF_SIZE)
+        len = DEFAULT_I2C_BUF_SIZE - 1;
+    Wire.readBytes(rxBuffer, len);
+    rxBuffer[len] = 0;
+
+    printHex("I2C RX", (uint8_t*)rxBuffer, len);
+
+    uint8_t receivedCRC = rxBuffer[len - 1];
+    uint8_t calcCRC = calcCRC8((uint8_t *)rxBuffer, len - 1);
+    if (receivedCRC != calcCRC)
+    {
+        DEBUG_SERIAL.printf("[receiveEvent]  CRC error (receivedCRD):%d vs (calcCRC):%d\n", receivedCRC, calcCRC);
+        return;
+    }
+
+    DeserializationError err = deserializeJson(jsonDocRx, rxBuffer, len - 1);
+    if (err)
+    {
+        DEBUG_SERIAL.printf("[receiveEvent] JSON Parse Error\n");
+        return;
+    }
+
+    if (jsonDocRx.containsKey("w"))
+    {
+        uint8_t cmd = jsonDocRx["w"];
+        handleWriteCommand(cmd);
+    }
+    else if (jsonDocRx.containsKey("r"))
+    {
+        uint8_t cmd = jsonDocRx["r"];
+        handleReadCommand(cmd);
+    }
+    else {
+        DEBUG_SERIAL.print("Payload-Error: ");
+        DEBUG_SERIAL.print(rxBuffer);
+    }
+}
+
+//-------------------------------------------------------------
+// I2C Request Event
+//-------------------------------------------------------------
+void requestEvent()
+{
+    // Antwort wird immer direkt in handleReadCommand() erzeugt
+}
+
+//-------------------------------------------------------------
+// Setup
+//-------------------------------------------------------------
+void setup()
+{
+    Serial.begin(115200);
+    DEBUG_SERIAL.printf("[setup]  ESP32 I2C slave startet, FastMode (400kHz)...\n");
+    // Wire.begin(I2C_SDA, I2C_SCL, I2C_SLAVE_ADDR);
+    // i2c_driver_delete(I2C_SLAVE_NUM);
+
+    // i2c_config_t conf = {};
+    // conf.mode = I2C_MODE_SLAVE;
+    // conf.sda_io_num = (gpio_num_t)I2C_SDA;
+    // conf.scl_io_num = (gpio_num_t)I2C_SCL;
+    // conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    // conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    // conf.slave.addr_10bit_en = 0;
+    // conf.slave.slave_addr = I2C_SLAVE_ADDR;
+    // conf.slave.maximum_speed = 400000;
+
+    // esp_err_t err = i2c_param_config(I2C_SLAVE_NUM, &conf);
+    // if (err != ESP_OK)
+    // {
+    //     DEBUG_SERIAL.printf("[I2C] i2c_param_config error : %d\n", err);
+    // }
+    // err = i2c_driver_install(I2C_SLAVE_NUM, I2C_MODE_SLAVE, I2C_BUFFER_SIZE, I2C_BUFFER_SIZE, 0);
+    // if (err != ESP_OK)
+    // {
+    //     DEBUG_SERIAL.printf("[I2C] i2c_driver_install error : %d\n", err);
+    // }
+
+    //    Wire.begin(I2C_SLAVE_ADDR);
+    // Wire.begin(I2C_SLAVE_ADDR, I2C_SDA, I2C_SCL);
+    // Wire.setPins(I2C_SDA, I2C_SCL);
+    // // Wire.setClock(100000);
+    // Wire.onReceive(receiveEvent);
+    // Wire.onRequest(requestEvent);
+
+    DEBUG_SERIAL.println("[setup] Initialisiere I2C-Slave...");
+
+    bool i2c_ready = false;
+    int timeout = 0;
+    while (!i2c_ready)
+    {
+
+        if (!initI2CSlave(DEFAULT_I2C_PORT, DEFAULT_I2C_SDA, DEFAULT_I2C_SCL,
+                          DEFAULT_I2C_ADDR, DEFAULT_I2C_BUF_SIZE,
+                          receiveEvent, requestEvent))
+        {
+            DEBUG_SERIAL.println("I2C-Initialisierung fehlgeschlagen!");
+            i2c_ready = false;
+            timeout++;
+            if (timeout > 5)
+            {
+                DEBUG_SERIAL.println("I2C Error nach 5 Fehlversuchen - reboot");
+                while (true)
+                {
+                }
+            }
+            delay(1000);
+        }
+        else
+        {
+            i2c_ready = true;
+        }
+    }
+
+    DEBUG_SERIAL.println("I2C-Slave bereit");
+
+    for (uint8_t i = 0; i < CMD_MAX; i++)
+    {
+        writeCallbacks[i] = nullptr;
+        readCallbacks[i] = nullptr;
+    }
+
+    // Write-Callbacks
+    writeCallbacks[CMD_WRITE_CONFIG] = cmdWriteConfig;
+    writeCallbacks[CMD_WRITE_SERVO_DRIVE] = cmdWriteServoDrive;
+
+    // Read-Callbacks
+    readCallbacks[CMD_READ_IMU_DATA] = cmdReadIMUData;
+    readCallbacks[CMD_READ_SERVO_STATE] = cmdReadServoState;
+    readCallbacks[CMD_READ_SYSTEM_INFO] = cmdReadSystemInfo;
+
+    DEBUG_SERIAL.println("I2C Kommandos erstellt");
+
+    // Dynamixel starten
+    DXL_SERIAL.begin(DXL_BAUDRATE, SERIAL_8N1, 16, 17);
+    dxl.begin(DXL_BAUDRATE);
+    dxl.setPortProtocolVersion(DXL_PROTOCOL);
+    delay(2000);
+
+    // Dynamixel-Scan
+    // alle gefundenen Servos erst einmal auf MODE: OP_POSTION setzen (Winkel 0-300Grad)
+    // scanDynamixels(dynaList, OP_POSITION);
+    if (!scanAllDynamixels(&dxl))
+    {
+        // DEBUG_SERIAL.println("SERVO-Liste falsch konfiguriert. Angegebene Servos nicht gefunden.");
+        while (true)
+        {
+            delay(1000);
+            DEBUG_SERIAL.print("ERROR ");
+        }
+    }
+
+    // vier Lenk-Servos erstellen
+    // ID=ServoID, Type=Steering oder Wheel, POS=VL(vorneLinks), ...
+    // CW=CW_ANGLE_LIMIT, CCW = CCW_ANGLE_LIMIT
+    // MID= Mittelposition
+    // START = Startposition - Rover fährt in gerader Linie
+
+    // vier Wheel-Servos erstellen
+    //                                        ID,Type,POS,CW,CCW,MID,START
+    velocityServos.add(createRoverServo(&dxl, 4, WHEEL, VL, 0, 0, 0, 0));
+    velocityServos.add(createRoverServo(&dxl, 11, WHEEL, VR, 0, 0, 0, 0));
+    velocityServos.add(createRoverServo(&dxl, 3, WHEEL, HL, 0, 0, 0, 0));
+    velocityServos.add(createRoverServo(&dxl, 1, WHEEL, HR, 0, 0, 0, 0));
+
+    // Lenk-Servos
+    //                                        ID,Type,POS,CW,CCW,MID,StartAngle, backward, forward, base_velo, TorqueOn
+    steeringServos.add(createRoverServo(&dxl, 8, STEERING, VL, 285, 673, 511, 356, 0, 1024, 200, true));  // ok
+    steeringServos.add(createRoverServo(&dxl, 7, STEERING, VR, 358, 746, 511, 675, 1024, 0, 200, true));  // ok
+    steeringServos.add(createRoverServo(&dxl, 17, STEERING, HL, 358, 746, 511, 675, 0, 1024, 200, true)); // ok
+    steeringServos.add(createRoverServo(&dxl, 18, STEERING, HR, 285, 673, 511, 356, 1024, 0, 200, true)); // ok
+
+    setAllServosToStandardPosition(&dxl, steeringServos, SteeringPosition::REGULAR);
+    setRoverVelocity(&dxl, 0.0, 0.0, 0);
+
+    DEBUG_SERIAL.println("Steering Servos in Startposition");
+
+    DEBUG_SERIAL.printf("[setup]  ESP32 I2C slave ready\n");
+}
+
+// -----------------------------
+// Hauptloop
+// -----------------------------
+void loop()
+{
+    // Hintergrund-Task / Nicht blockierend!
+    delay(1); // Minimale Entlastung
+}

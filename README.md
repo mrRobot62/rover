@@ -15,7 +15,7 @@ Akuell arbeiten wir getrennt mit zwei Rover die beide zwar auf ROS2 basieren abe
 
 ## ROS2-HUMBLE
 Hardware: Raspberry PI4, 4GB RAM, SD-Card
-- **OS:** Ubuntu 20.04
+- **OS:** Ubuntu 22.04
 - **ROS2:** Humble
 - **LIDAR:** YDLidar TMini Pro
 - **Antrieb:** 8x Dynamixel AX12+ Servos, 4 für Antrieb, 4 für Lenkung (Allradlenkung)

@@ -3,16 +3,16 @@
 # werden können.
 # ------------------------------------------------------
 rover:
-  # ---- LEDs am rover
-  # GPIO Pins so definieren, wie sie im ESP32 genutzt werden
-  led_pin_turn_indicator: 18
-  led_pin_lights: 19
-  led_pin_break_light: 20
+  ros__parameters:
+    # ---- LEDs am rover
+    # GPIO Pins so definieren, wie sie im ESP32 genutzt werden
+    led_pin_turn_indicator: 18
+    led_pin_lights: 19
+    led_pin_break_light: 20
 
-  # ---- Eingangs-Pins am EPS32
-  #
-  pin_in_ultrasonic: 21
-
+    # ---- Eingangs-Pins am EPS32
+    #
+    pin_in_ultrasonic: 21
 
 odom_node:
   ros__parameters:
@@ -22,13 +22,17 @@ odom_node:
 
 sensor_node:
   ros__parameters:
-    some_setting: true
+    battery_sensor_gain: 1.0
 
 led_node:
   ros__parameters:
-    led_topic : "/led"
-    led_type : "WS2812"
-    led_num_pixels : 28
+    led_topic: "/led"
+    led_type: "WS2812"
+    led_num_pixels: 28
+    led_brightness: 0.3
+    led_default_timeout: 1000
+    led_default_duration_on: 500
+    led_default_duration_off: 500
     
 
 # ------------------------------------------------------
@@ -67,6 +71,10 @@ driver_controller_node:
     reverse_steering: true
     reverse_velocity: false
     # Joystick mappings
+    # LJ_LR = 0, LJ_UD = 1
+    # RJ_LR = 2, RJ_UD = 3
+    # PAD_LR = 4, PAD_UD = 5
     map_js_steering: 0     # LJ_LR (Wert aus ENUM JOYSTICKS)
     map_js_velocity: 1     # LJ_UD
-    map_js_cam_lr: 2
+    map_js_cam_turn: 2     # RJ_LR
+    map_js_cam_tilt: 3     # RJ_UD

@@ -27,7 +27,6 @@ def generate_launch_description():
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
     default_param_file = os.path.join(share_dir, 'config', 'rover.yaml')
 
-
     lidar_model_arg = DeclareLaunchArgument(
         'lidar_model',
         default_value='ydlidar',
@@ -67,7 +66,7 @@ def generate_launch_description():
         nodes.append(sensor_node)
 
         if model == 'ydlidar':
-            logger.info("Create YDLidar -> [{params}]")
+            logger.info("Create YDLidar Node -> [{params}]")
             ydlidar_launch_file = params.get('ydlidar_launch', 'full_lidar.launch.py')
             ydlidar_param_file = params.get('ydlidar_param', 'TminiPlus.yaml')
 
@@ -95,13 +94,17 @@ def generate_launch_description():
             ))
 
         elif model == 'xv11':
-            logger.info("Create XV11Lidar -> [{params}]")
-            return [Node(
-                package='xv_11_laser_driver',
-                executable='xv_11_laser_node',
-                name='xv11_node',
-                parameters=[params]
-            )]
+            logger.info("Create XV11Lidar Node -> [{params}]")
+            nodes.append(
+                Node(
+                    package='xv11_lidar_python',
+                    executable='xv11_lidar',
+                    name='xv11_lidar_node',
+                    output='screen',
+                    parameters=[params]
+                )
+            )
+
         
         return nodes
 
@@ -148,14 +151,66 @@ def generate_launch_description():
     #     }]
     # )
 
+    """
+    Transform-Node. Dieser Node Transformiert die Welt-Koordinaten auf base_link
+    Das wird benötigt um später z.b SLAM nutzen zu können
+
+    """
+    tf2_world_node = Node(package='tf2_ros',
+                    executable='static_transform_publisher',
+                    name='world_to_base_link',
+                    arguments=[
+                        '--x', '0.0',
+                        '--y', '0.0',
+                        '--z', '0.0',
+                        '--roll', '0.0',
+                        '--pitch', '0.0',
+                        '--yaw', '0.0',
+                        '--frame-id', 'world',
+                        '--child-frame-id', 'base_link',
+                    ],                    
+                    )
+
+    """
+    Transform-Node. Dieser Node Transformiert die Sensordaten aus dem Frame 'laser_frame' (siehe TminiPro.yaml) in base_link
+    base_link symbolisiert die physische Verortung des Sensors auf dem Roboter.
+
+    """
+    tf2_base_link_node = Node(package='tf2_ros',
+                    executable='static_transform_publisher',
+                    name='base_link_to_laser_frame',
+                    arguments=[
+                        '--x', '0.10',
+                        '--y', '0.0',
+                        '--z', '0.15',
+                        '--roll', '0.0',
+                        '--pitch', '0.0',
+                        '--yaw', '0.0',
+                        '--frame-id', 'base_link',
+                        '--child-frame-id', 'laser_frame',
+                    ],                    
+                    )
+
     # 🚗 Drive Controller Node
-    driver_controller_node = Node(
-        package='rover',
-        executable='driver_controller_node',
-        name='driver_controller_node',
-        output='screen',
-        parameters=[LaunchConfiguration('params_file')]
-    )
+    # driver_controller_node = Node(
+    #     package='rover',
+    #     executable='driver_controller_node',
+    #     name='driver_controller_node',
+    #     output='screen',
+    #     parameters=[LaunchConfiguration('params_file')]
+    # )
+
+    def create_driver_controller_node(context):
+        params_file = LaunchConfiguration('params_file').perform(context)
+        return [
+            Node(
+                package='rover',
+                executable='driver_controller_node',
+                name='driver_controller_node',
+                output='screen',
+                parameters=[params_file]
+            )
+        ]
 
     # 🧭 Navigation Node
     navigation_node = Node(
@@ -198,6 +253,15 @@ def generate_launch_description():
         parameters=[LaunchConfiguration('params_file')]
     )
 
+    # LED Node
+    led_node = Node(
+        package='rover',
+        executable='led_node',
+        name='led_node',
+        output='screen',
+        parameters=[LaunchConfiguration('params_file')]
+    )
+
     # 🕹️ Gamepad Steuerung über teleop_twist_joy
     teleop_twist_joy_launch_path = os.path.join(
         get_package_share_directory('teleop_twist_joy'),
@@ -226,7 +290,11 @@ def generate_launch_description():
         LogInfo(msg='[Launch] Starte Sensorik und Steuerung...'),
         #sensor_node,
         #manual_control_node,
-        driver_controller_node,
+        led_node,
+        tf2_world_node,
+        tf2_base_link_node,
+        #driver_controller_node,
+        OpaqueFunction(function=create_driver_controller_node),  # <== ersetzt den alten driver_controller_node
         odom_node,
 #        lifecycle_manager,
 #        lifecycle_status_marker_node 
@@ -239,12 +307,28 @@ def generate_launch_description():
         vision_node
     ])
  
+    logo = """
+    \n
+    ____   ____  _____ ___      ____   ____  _    __ ______ ____ 
+   / __ \ / __ \/ ___/|__ \    / __ \ / __ \| |  / // ____// __ \ 
+  / /_/ // / / /\__ \ __/ /   / /_/ // / / /| | / // __/  / /_/ /
+ / _, _// /_/ /___/ // __/   / _, _// /_/ / | |/ // /___ / _, _/ 
+/_/ |_| \____//____//____/  /_/ |_| \____/  |___//_____//_/ |_|  
+    ____                  _              __                      
+   / __ \ _____ ____     (_)___   _____ / /_                     
+  / /_/ // ___// __ \   / // _ \ / ___// __/                     
+ / ____// /   / /_/ /  / //  __// /__ / /_                       
+/_/    /_/    \____/__/ / \___/ \___/ \__/                       
+                   /___/                                         
+"""
 
     # 🔁 Rückgabe der LaunchDescription
     return LaunchDescription([
+        LogInfo(msg=[logo, '\n\n']),
         lidar_model_arg,
         rviz_load_arg,
         params_file_arg,
+        LogInfo(msg=['#### [Launch DEBUG] params_file: ', LaunchConfiguration('params_file')]),
         OpaqueFunction(function=create_lidar_node),
         core_nodes,
         nav_vision_nodes,

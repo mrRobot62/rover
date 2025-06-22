@@ -53,35 +53,46 @@ class DriverControllerNode(Node):
 
         self.rover_driver = RoverDriver(self.get_logger())
         # Parameter deklarieren mit Default
-        self.declare_parameter('cmd_vel_topic', '/joy')
+        #self.declare_parameter('cmd_vel_topic', '/joy')
+        # self.declare_parameters(
+        # namespace='',
+        # parameters=[
+        #     ('cmd_vel_topic', '/joy'),
+        #     ('log_level', 'INFO'),
+        #     ('reverse_steering', True),
+        #     ('reverse_velocity', False),
+        #     ('map_js_steering', 0),
+        #     ('map_js_velocity', 1),
+        #     ('map_js_cam_lr', 2)
+        # ])
 
-        # Parameter auslesen
-        cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
-        # Parameter aus YAML oder Default übernehmen
-        self.reverse_steering = self.get_parameter_or(
-            'reverse_steering',
-            Parameter('reverse_steering', Parameter.Type.BOOL, False)
-        ).value
-
-        self.reverse_velocity = self.get_parameter_or(
-            'reverse_velocity',
-            Parameter('reverse_velocity', Parameter.Type.BOOL, False)
-        ).value
+        self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
+        self.log_level = self.get_parameter('log_level').get_parameter_value().string_value
+        self.reverse_steering = self.get_parameter('reverse_steering').get_parameter_value().bool_value
+        self.reverse_velocity = self.get_parameter('reverse_velocity').get_parameter_value().bool_value
+        self.map_js_steering = self.get_parameter('map_js_steering').get_parameter_value().integer_value
+        self.map_js_velocity = self.get_parameter('map_js_velocity').get_parameter_value().integer_value
+        self.map_js_cam_turn = self.get_parameter('map_js_cam_turn').get_parameter_value().integer_value
+        self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
 
         self.get_logger().info(
-            f" - cmd_vel_topic:     {cmd_vel_topic}"
-        )
-        self.get_logger().info(
-            f" - reverse_steering:  {self.reverse_steering}"
-        )
-        self.get_logger().info(
-            f" - reverse_velocity:  {self.reverse_velocity}"
-        )
+f"""
+DriverControllerNode config:
+--------------------------------
+Topic:{self.cmd_vel_topic},
+DebugLevel:         {self.log_level},
+ReverseSteering:    {self.reverse_steering},
+ReverseVelocity:    {self.reverse_velocity},
+MappingSteering:    {self.map_js_steering},
+MappingVelocity:    {self.map_js_velocity},
+MappingCameraTurn:  {self.map_js_cam_turn},
+MappingCameraTilt:  {self.map_js_cam_tilt},
+""")
         
         # Subscriber anlegen (hier für Twist Nachrichten)
         self.subscription = self.create_subscription(
             Joy,   # oder Joy, falls das dein Message-Typ ist
-            cmd_vel_topic,
+            self.cmd_vel_topic,
             self.cmd_driver_callback,
             10
         )
@@ -102,7 +113,7 @@ class DriverControllerNode(Node):
         # 500ms Timer für Blinken
         self.timer = self.create_timer(0.5, self.blink_timer_callback)
 
-        self.get_logger().info(f'DriverControllerNode gestartet. Warte auf {cmd_vel_topic}...')
+        self.get_logger().info(f'DriverControllerNode gestartet. Warte auf {self.cmd_vel_topic}...')
 
     def blink_timer_callback(self):
         """

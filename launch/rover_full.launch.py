@@ -25,8 +25,7 @@ def generate_launch_description():
     share_dir = get_package_share_directory('rover')
     rviz_config_file = os.path.join(share_dir, 'config/rviz', 'rover.rviz')
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
-    default_param_file = os.path.join(share_dir, 'config', 'rover.yaml')
-
+    params_file = os.path.join(share_dir, 'config', 'rover.yaml')
 
     lidar_model_arg = DeclareLaunchArgument(
         'lidar_model',
@@ -49,7 +48,7 @@ def generate_launch_description():
     #
     def create_lidar_node(context):
         model = context.launch_configurations['lidar_model']
-        params = load_rover_params(default_param_file, model)
+        params = load_rover_params(params_file, model)
 
         nodes = []
 
@@ -128,7 +127,7 @@ def generate_launch_description():
     # 🧾 Launch-Argumente
     params_file_arg = DeclareLaunchArgument(
         'params_file',
-        default_value=default_param_file,
+        default_value=params_file,
         description='Pfad zur Parameterdatei des Rovers'
     )
 
@@ -193,16 +192,14 @@ def generate_launch_description():
                     )
 
     # 🚗 Drive Controller Node
-    # driver_controller_node = Node(
-    #     package='rover',
-    #     executable='driver_controller_node',
-    #     name='driver_controller_node',
-    #     output='screen',
-    #     parameters=[LaunchConfiguration('params_file')]
-    # )
+    # wenn man so in der Launch den Node deklariert.
+    # muss man innerhalb des Nodes die Parameter nicht vorher deklarieren
+    # sondern kann sie direkt auslesen.
+    # Nachteil ist ein Parameter nicht vorhanden, wird ein Fehler geloggt und der
+    # Node startet nicht
+    # Vorteil: deutlich einfacher innerhalb des Nodes
 
     def create_driver_controller_node(context):
-        params_file = LaunchConfiguration('params_file').perform(context)
         return [
             Node(
                 package='rover',
@@ -219,7 +216,8 @@ def generate_launch_description():
         executable='navigation_node',
         name='navigation_node',
         output='screen',
-        parameters=[LaunchConfiguration('params_file')]
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
     )
 
     # 🔄 Odometrie Node (als LifecycleNode)
@@ -229,7 +227,8 @@ def generate_launch_description():
         name='odom_node',
         output='screen',
         namespace='/',
-        parameters=[LaunchConfiguration('params_file')]
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
     )
 
     # ⚙️ Lifecycle Manager für den odom_node
@@ -251,16 +250,25 @@ def generate_launch_description():
         executable='vision_node',
         name='vision_node',
         output='screen',
-        parameters=[LaunchConfiguration('params_file')]
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
     )
 
     # LED Node
+    #
+    # wenn man so in der Launch den Node deklariert.
+    # muss man innerhalb des Nodes die Parameter vorher deklarieren
+    # erst dann kann man sie auslesen
+    # 
+    # Vorteil: sollte ein Parameter nicht vorhanden sein, kann man default werten arbeiten (sicherer)
+    # Nachteil: mehr Code im Node
     led_node = Node(
+
         package='rover',
         executable='led_node',
         name='led_node',
         output='screen',
-        parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
     )
 
     # 🕹️ Gamepad Steuerung über teleop_twist_joy

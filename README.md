@@ -1,7 +1,11 @@
 # ROS2 ROVER Project
 
-Robot-Rover Projekt basierend auf ROS2 auf einem Raspberry PI4 oder PI5.
+Dies ist das erste ROS2-Robotik Projekt das wir durchführen. Daher sind sicherlich einige Implementierungen die durchgeführt werden nicht ROS2 optimiert, stellen aber eine funktionierende Grundlage für weitere
+Arbeiten zur Verfügung
+
+**Robot-Rover Projekt** basierend auf ROS2 auf einem Raspberry PI4 oder PI5.
 Akuell arbeiten wir getrennt mit zwei Rover die beide zwar auf ROS2 basieren aber doch unterschiedlich konfiguriert sind
+
 
 ## ROS2-HUMBLE
 Hardware: Raspberry PI4, 4GB RAM, SD-Card
@@ -22,6 +26,18 @@ Steuerung:** Gampad Logitech F710
 - **Steuerung:** Gampad Logitech F710
 - **Autonom:** in Arbeit
 - **Kamera:** in Arbeit
+
+# Ziel des Projektes
+Ziel des Projektes ist ein autonomer Rover Roboter zu bauen, basierend auf ROS2 und diverser Sensoren.
+- Komplexere Ansteuerung der Antriebskette durch einen Allradantrieb und Allradlenkung
+- ROS2 lernen und verstehen
+- Auslagerung von Funktionalität auf einen ESP32 inkl. der Erstellung der Firmware und Kommunikation mit dem PI (Host)
+- Visualisierung des Rovers über RVIZ
+- LIDAR-Sensor für die Hindernis-Erkennung
+- Kamera für Objekterkennung, Hindernis-Vermeidung
+- Navigation-Planning
+- SLAM
+- Odometrie
 
 ## Antrieb und Lenkung
 Der Rover hat eine Allrad-Lenkung und wird von vier Antriebseinheiten gesteuert. Jede Antriebseinheit besteht aus zwei Dynamixel-AX12+ Servos. Ein Servo für den Radantribe (Velocity), ein Servo für die Lenkung des Rades (Steering). Angesteuert werden alle Servos über ein Dynamixel-BUS-Protokol (1.0 nicht 2.0!). Die dazugehörige Firmware wurde in einen ESP32 implementiert und bietet eine I2C Schnittstelle für die Kommunikation mit des Raspberry PI. Zur Ansteuerung von Dynamixel-Servos bedarf es einer kleinen Elektronik die exaktes Timing und Flanken für das BUS-Protokoll bereitstellt und basiert auf eine SN74LS241 und einem LevelShifter von 3.3v auf 5v.Details siehe ESP32-Schaltplan bzw. unter doc/esp32 die dazugehörigen Dokumentationen

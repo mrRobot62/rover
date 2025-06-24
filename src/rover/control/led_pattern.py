@@ -13,15 +13,12 @@ class LEDPattern(Enum):
     ORANGE=3
     WHITE=4
 
-    # build-in pattern
-    RAINBOW=5
-
     # Rover-Pattern
     BLINK_LEFT = 10
     BLINK_RIGHT = 11
     HAZARD_LIGHT = 12
     
-    # Rover Info Pattern
+    # Rover sensor_node
     BATTERY_100 = 100
     BATTERY_90 = 101
     BATTERY_80 = 102
@@ -34,12 +31,22 @@ class LEDPattern(Enum):
     BATTERY_10 = 108
     BATTERY_LOW = 109
 
-    # Rover Error Codes
+    # Rover - driver_controller_node
     DYNA_NOT_AVAILABLE = 200
     DYNA_PROBLEM = 201
     I2C_ESP32_NOT_FOUND = 250
     I2C_ESP32_STATE_ERR = 251
 
+    # Rover - navigation_node
+
+    # Rover - vision_node
+
+    # Rover - odom_node
+
     PI_WIFI_NOT_AVAILABLE = 300
 
+
+
     UNKNOWN_ERROR = 1000
+
+

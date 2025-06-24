@@ -30,7 +30,7 @@ led_node:
     led_type: "WS2812"
     led_num_pixels: 28
     led_brightness: 0.3
-    led_default_timeout: 1000
+    led_default_timeout: 1500
     led_default_duration_on: 500
     led_default_duration_off: 500
     

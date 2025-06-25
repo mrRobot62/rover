@@ -84,5 +84,30 @@ Die neue LEDPattern.xxxx nutzen die man im ENUM erstellt hat
 ggf. muss eine Anpassung an der ledmask vorgenommen werden.
 bei Bedarf in der Klasse LEDUtils eine neue Combination erstellen.
 
+```
+            LEDPattern.RED: LEDPatternConfig(LEDPattern.RED, 
+                "FILL RED", 
+                duration=0, 
+                timeout=0, 
+                callback='fill', 
+                callback_param={
+                    "color":(255, 0, 0),
+                    "timeout":self.led_default_timeout, 
+                    "duration_on": self.led_default_duration_on, 
+                    "duration_off": self.led_default_duration_off, 
+                    "brightness": self.led_default_brightness,
+                    "ledmask" : LEDUtils.combination_mask('ALL')
+                }
+            ),
+```
+- callback = 'xxxxx' - hier muss der Funktionsname eingetragen werden der in ws2812 implementiert wird. Falls man mit fill nicht klar kommt
+- callback_param - die sind entscheidend wie das Muster dargesetellt wird
+- Sprechenden namen geben. Im Beispiel "FILL RED"
+
+
 ## LEDPatternConfig
 keine Anpassung notwendig
+
+## class WS2812 anpassen
+wenn man tatsächlich ein komplett neues Muster implementieren möchte, muss dies hier in dieser Klasse implementiert werden, analog zu `fill` und `blink`.
+Der Name der Funktion ist dann auch der name der als callback-funktion genutzt werden muss.

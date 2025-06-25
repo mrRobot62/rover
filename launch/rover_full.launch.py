@@ -54,15 +54,30 @@ def generate_launch_description():
 
         # 📡 Sensor Node
         lidar_topic = params.get('lidar_topic', '/scan')
-        sensor_node = Node(
+        sensor_node = LifecycleNode(
             package='rover',
             executable='sensor_node',
             name='sensor_node',
             output='screen',
-            parameters=[{
-                'lidar_topic': TextSubstitution(text=lidar_topic)
-            }]
+            namespace='/',
+            #parameters=[LaunchConfiguration('params_file')]
+            parameters=[
+                params_file, 
+                {'lidar_topic': TextSubstitution(text=lidar_topic)}
+            ]
         )
+
+
+        # sensor_node = Node(
+        #     package='rover',
+        #     executable='sensor_node',
+        #     name='sensor_node',
+        #     output='screen',
+        #     parameters=[{
+        #         'lidar_topic': TextSubstitution(text=lidar_topic)
+        #     }]
+        # )
+
         nodes.append(sensor_node)
 
         if model == 'ydlidar':
@@ -132,24 +147,7 @@ def generate_launch_description():
     )
 
 
-    # 🧾 Lifecycle Marker Node (zeigt den Zustand von odom_node in RViz an)
-    lifecycle_status_marker_node = Node(
-        package='rover',
-        executable='lifecycle_status_marker',
-        name='lifecycle_status_marker',
-        output='screen'
-    )
 
-    # # 📡 Sensor Node
-    # sensor_node = Node(
-    #     package='rover',
-    #     executable='sensor_node',
-    #     name='sensor_node',
-    #     output='screen',
-    #     parameters=[{
-    #         'lidar_topic': TextSubstitution(text=lidar_topic)
-    #     }]
-    # )
 
     """
     Transform-Node. Dieser Node Transformiert die Welt-Koordinaten auf base_link
@@ -220,40 +218,6 @@ def generate_launch_description():
         parameters=[params_file]
     )
 
-    # 🔄 Odometrie Node (als LifecycleNode)
-    odom_node = LifecycleNode(
-        package='rover',
-        executable='odom_node',
-        name='odom_node',
-        output='screen',
-        namespace='/',
-        #parameters=[LaunchConfiguration('params_file')]
-        parameters=[params_file]
-    )
-
-    # ⚙️ Lifecycle Manager für den odom_node
-    lifecycle_manager = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_odom',
-        output='screen',
-        parameters=[{
-            'autostart': True,
-            'node_names': ['odom_node'],
-            'bond_timeout': 0.0
-        }]
-    )
-
-    # 🎥 Vision Node
-    vision_node = Node(
-        package='rover',
-        executable='vision_node',
-        name='vision_node',
-        output='screen',
-        #parameters=[LaunchConfiguration('params_file')]
-        parameters=[params_file]
-    )
-
     # LED Node
     #
     # wenn man so in der Launch den Node deklariert.
@@ -270,6 +234,63 @@ def generate_launch_description():
         output='screen',
         parameters=[params_file]
     )
+
+    #--------------------------------------------------------------------------------------
+    # LifeCycle Nodes und Management
+    #--------------------------------------------------------------------------------------
+    # 🔄 Odometrie Node (als LifecycleNode)
+    odom_node = LifecycleNode(
+        package='rover',
+        executable='odom_node',
+        name='odom_node',
+        output='screen',
+        namespace='/',
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
+    )
+
+    # 🎥 Vision Node
+    # vision_node = Node(
+    #     package='rover',
+    #     executable='vision_node',
+    #     name='vision_node',
+    #     output='screen',
+    #     #parameters=[LaunchConfiguration('params_file')]
+    #     parameters=[params_file]
+    # )
+    vision_node = LifecycleNode(
+        package='rover',
+        executable='vision_node',
+        name='vision_node',
+        output='screen',
+        namespace='/',
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
+    )
+
+
+    # ⚙️ Lifecycle Manager für den odom_node
+    lifecycle_manager = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_odom',
+        output='screen',
+        parameters=[{
+            'autostart': True,
+            'node_names': ['odom_node'],
+            'bond_timeout': 0.0
+        }]
+    )
+    # 🧾 Lifecycle Marker Node (zeigt den Zustand von LifeCycle Nodes an in RViz an)
+    lifecycle_status_marker_node = Node(
+        package='rover',
+        executable='lifecycle_status_marker',
+        name='lifecycle_status_marker',
+        output='screen'
+    )
+
+    #--------------------------------------------------------------------------------------
+
 
     # 🕹️ Gamepad Steuerung über teleop_twist_joy
     teleop_twist_joy_launch_path = os.path.join(
@@ -294,19 +315,15 @@ def generate_launch_description():
         )
     ])
 
-    # 📦 Gruppenbildung
+    # 📦 Gruppenbildung - 
     core_nodes = GroupAction([
         LogInfo(msg='[Launch] Starte Sensorik und Steuerung...'),
-        #sensor_node,
-        #manual_control_node,
-        led_node,
+        #sensor_node ----> sensor_node wird im Rahmen des create_lidar mit kreiert
         tf2_world_node,
         tf2_base_link_node,
-        #driver_controller_node,
+        led_node,
         OpaqueFunction(function=create_driver_controller_node),  # <== ersetzt den alten driver_controller_node
         odom_node,
-#        lifecycle_manager,
-#        lifecycle_status_marker_node 
         gamepad_nodes
     ])
 
@@ -316,6 +333,12 @@ def generate_launch_description():
         vision_node
     ])
  
+    lifecycle_nodes = GroupAction([
+        LogInfo(msg='[Launch] Initialisiere Lifecycle Manager...'),
+        lifecycle_manager,
+        lifecycle_status_marker_node
+    ])
+
     logo = """
     ____   ____  _____ ___      ____   ____  _    __ ______ ____ 
    / __ \ / __ \/ ___/|__ \    / __ \ / __ \| |  / // ____// __ \ 
@@ -336,9 +359,9 @@ def generate_launch_description():
         lidar_model_arg,
         rviz_load_arg,
         params_file_arg,
-        LogInfo(msg=['#### [Launch DEBUG] params_file: ', LaunchConfiguration('params_file')]),
-        OpaqueFunction(function=create_lidar_node),
+        OpaqueFunction(function=create_lidar_node), # inkl. sensor_node
         core_nodes,
         nav_vision_nodes,
+        lifecycle_nodes,
         OpaqueFunction(function=create_nodes_from_arguments)
     ])

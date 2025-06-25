@@ -35,7 +35,6 @@ setup(
             'navigation_node = rover.navigation_node:main',
             'vision_node = rover.vision_node:main',
             'led_node = rover.led_node:main',
-            #'manual_control_node = rover.manual_control_node:main',
             'lifecycle_dashboard = rover.lifecycle_dashboard:main',
             'lifecycle_status_marker = rover.lifecycle_status_marker:main', 
         ],

@@ -22,8 +22,12 @@ odom_node:
 
 sensor_node:
   ros__parameters:
+    battery_topic: "/battery"
     battery_sensor_gain: 1.0
-
+    battery_critical: 13.1
+    battery_low: 13.4
+    battery_full: 16.2
+    
 led_node:
   ros__parameters:
     led_topic: "/led"

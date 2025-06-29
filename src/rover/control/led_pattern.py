@@ -4,19 +4,19 @@ class LEDPattern(Enum):
     """
     Enumeration zur einfacheren Nutzung der unterschiedlichen Patterns
     """
-    # Full color
+    # fill()
     RED=0
     GREEN=1
     BLUE=2
     ORANGE=3
     WHITE=4
 
-    # Rover-Pattern
+    # blink()
     BLINK_LEFT = 10
     BLINK_RIGHT = 11
     HAZARD_LIGHT = 12
     
-    # Rover sensor_node
+    # fill()
     BATTERY_100 = 100
     BATTERY_90 = 101
     BATTERY_80 = 102
@@ -26,10 +26,13 @@ class LEDPattern(Enum):
     BATTERY_40 = 106
     BATTERY_30 = 106
     BATTERY_20 = 107
+    
+    # blink()
     BATTERY_10 = 108
     BATTERY_LOW = 109
 
     # Rover - driver_controller_node
+    # blink()
     DYNA_NOT_AVAILABLE = 200
     DYNA_PROBLEM = 201
     I2C_ESP32_NOT_FOUND = 250
@@ -47,6 +50,8 @@ class LEDPattern(Enum):
     # Rover
     # Software
     PI_WIFI_NOT_AVAILABLE = 500
+
+    # circle()
     ROVER_BOOT1 = 510
     ROVER_BOOT2 = 511
     ROVER_BOOT3 = 512

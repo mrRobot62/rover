@@ -7,6 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch.conditions import IfCondition
 from launch.actions import OpaqueFunction
 from launch.substitutions import TextSubstitution
+from launch.actions import TimerAction
 
 import launch.logging
 
@@ -39,6 +40,21 @@ def generate_launch_description():
         description='RViz starten oder nicht'
     )
 
+    lidar_model = LaunchConfiguration('lidar_model')
+    lidar_topic = LaunchConfiguration('lidar_topic', default='/scan')
+
+    sensor_node = LifecycleNode(
+        package='rover',
+        executable='sensor_node',
+        name='sensor_node',
+        output='screen',
+        namespace='/',
+        parameters=[
+            LaunchConfiguration('params_file'),
+            {'lidar_topic': lidar_topic}
+        ]
+    )
+
     # wird nur dann benötigt, wenn ich direkt ein Node erstellen möchte
     #lidar_model = LaunchConfiguration('lidar_model')
 
@@ -51,34 +67,6 @@ def generate_launch_description():
         params = load_rover_params(params_file, model)
 
         nodes = []
-
-        # 📡 Sensor Node
-        lidar_topic = params.get('lidar_topic', '/scan')
-        sensor_node = LifecycleNode(
-            package='rover',
-            executable='sensor_node',
-            name='sensor_node',
-            output='screen',
-            namespace='/',
-            #parameters=[LaunchConfiguration('params_file')]
-            parameters=[
-                params_file, 
-                {'lidar_topic': TextSubstitution(text=lidar_topic)}
-            ]
-        )
-
-
-        # sensor_node = Node(
-        #     package='rover',
-        #     executable='sensor_node',
-        #     name='sensor_node',
-        #     output='screen',
-        #     parameters=[{
-        #         'lidar_topic': TextSubstitution(text=lidar_topic)
-        #     }]
-        # )
-
-        nodes.append(sensor_node)
 
         if model == 'ydlidar':
             logger.info("Create YDLidar Node -> [{params}]")
@@ -270,18 +258,24 @@ def generate_launch_description():
 
 
     # ⚙️ Lifecycle Manager für den odom_node
-    lifecycle_manager = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_odom',
-        output='screen',
-        parameters=[{
-            'autostart': True,
-            'node_names': ['odom_node'],
-            'bond_timeout': 0.0
-        }]
+    lifecycle_manager = TimerAction(
+        period=3.0,  # ⏱️ 3 Sekunden Verzögerung
+        actions=[
+            Node(
+                package='nav2_lifecycle_manager',
+                executable='lifecycle_manager',
+                name='lifecycle_manager_odom',
+                output='screen',
+                parameters=[{
+                    'autostart': True,
+#                    'node_names': [ 'sensor_node','odom_node', 'vision_node'],
+                    'node_names': [ 'odom_node'],
+                    'bond_timeout': 1.0
+                }]
+            )
+        ]
     )
-    # 🧾 Lifecycle Marker Node (zeigt den Zustand von LifeCycle Nodes an in RViz an)
+
     lifecycle_status_marker_node = Node(
         package='rover',
         executable='lifecycle_status_marker',
@@ -318,10 +312,10 @@ def generate_launch_description():
     # 📦 Gruppenbildung - 
     core_nodes = GroupAction([
         LogInfo(msg='[Launch] Starte Sensorik und Steuerung...'),
-        #sensor_node ----> sensor_node wird im Rahmen des create_lidar mit kreiert
+        led_node,
+        sensor_node,
         tf2_world_node,
         tf2_base_link_node,
-        led_node,
         OpaqueFunction(function=create_driver_controller_node),  # <== ersetzt den alten driver_controller_node
         odom_node,
         gamepad_nodes
@@ -359,7 +353,7 @@ def generate_launch_description():
         lidar_model_arg,
         rviz_load_arg,
         params_file_arg,
-        OpaqueFunction(function=create_lidar_node), # inkl. sensor_node
+        OpaqueFunction(function=create_lidar_node),
         core_nodes,
         nav_vision_nodes,
         lifecycle_nodes,

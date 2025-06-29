@@ -54,7 +54,6 @@ class WS2812SPI:
         self._fill_thread = None
         self._blink_thread = None
         self._run_thread = None
-        self._circle_thread = None
 
         self.driver = neopixel_spi.NeoPixel_SPI(
             board.SPI(),
@@ -141,7 +140,7 @@ class WS2812SPI:
         self._blink_thread = threading.Thread(target=_blink_loop, daemon=True)
         self._blink_thread.start()
 
-    def run(self, color=(0, 255, 0), ledmask=None, duration_on=100, duration_off=50, timeout=50, **kwargs):
+    def run(self, color=(0, 255, 0), ledmask=None, duration_on=200, duration_off=200, timeout=100, **kwargs):
         """
         Lauflicht-Effekt: LEDs der Maske nacheinander AN/AUS mit Verzögerung.
 
@@ -188,67 +187,9 @@ class WS2812SPI:
             for i in active_indices:
                 self.driver[i] = (0, 0, 0)
             self.driver.show()
-            self.stop()
 
         self._run_thread = threading.Thread(target=_run_loop, daemon=True)
         self._run_thread.start()
-
-    def circle(self, color=(0, 255, 0), duration_on=100, duration_off=50, timeout=3000, **kwargs):
-        """
-        Paralleles Lauflicht über alle Ringe (LED2–LED7 pro Ring) für die Dauer von `timeout`.
-
-        :param color: Farbe der LEDs
-        :param duration_on: An-Zeit jeder LED-Gruppe (ms)
-        :param duration_off: Aus-Zeit nach jedem Schritt (ms)
-        :param timeout: Gesamtdauer des Effekts (ms)
-        """
-        self.stop()
-        color = self.apply_brightness(color)
-
-        # Erzeuge Gruppen: LEDs 1–6 je Ring (überspringt LED0 je Ring)
-        led_groups = []
-        for i in range(1, 7):  # LED-Index innerhalb des Rings
-            group = [i, i + 7, i + 14, i + 21]
-            led_groups.append(group)
-
-        def _circle_loop():
-            start_time = time.time()
-            while not self._stop_event.is_set():
-                elapsed = (time.time() - start_time) * 1000
-                if timeout > 0 and elapsed >= timeout:
-                    break
-
-                for group in led_groups:
-                    if self._stop_event.is_set():
-                        break
-
-                    elapsed = (time.time() - start_time) * 1000
-                    if timeout > 0 and elapsed >= timeout:
-                        break
-
-                    # LEDs aktivieren
-                    for i in range(self.num_pixels):
-                        self.driver[i] = color if i in group else (0, 0, 0)
-                    self.driver.show()
-
-                    if self._wait_or_stop(duration_on):
-                        return
-
-                    # LEDs deaktivieren
-                    for i in group:
-                        self.driver[i] = (0, 0, 0)
-                    self.driver.show()
-
-                    if self._wait_or_stop(duration_off):
-                        return
-
-            # Alle LEDs am Ende ausschalten
-            self.driver.fill((0, 0, 0))
-            self.driver.show()
-
-        self._circle_thread = threading.Thread(target=_circle_loop, daemon=True)
-        self._circle_thread.start()
-
 
 
     def _wait_or_stop(self, duration_ms):

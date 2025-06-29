@@ -1,6 +1,4 @@
 from enum import Enum
-from ..hardware.ws2812_driver import WS2812
-
 
 class LEDPattern(Enum):
     """
@@ -38,15 +36,25 @@ class LEDPattern(Enum):
     I2C_ESP32_STATE_ERR = 251
 
     # Rover - navigation_node
-
+    # 300-399
+    #     
     # Rover - vision_node
+    # 400 - 499
 
     # Rover - odom_node
+    # 500 - 599
 
-    PI_WIFI_NOT_AVAILABLE = 300
-
+    # Rover
+    # Software
+    PI_WIFI_NOT_AVAILABLE = 500
+    ROVER_BOOT1 = 510
+    ROVER_BOOT2 = 511
+    ROVER_BOOT3 = 512
+    ROVER_SHUTDOWN1 = 515
+    ROVER_SHUTDOWN2 = 516
 
 
     UNKNOWN_ERROR = 1000
+    STOP = 9999
 
 

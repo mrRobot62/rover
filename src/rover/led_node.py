@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from .control.led_pattern import LEDPattern
-from .hardware.ws2812_driver import WS2812
+from .hardware.ws2812_driver import WS2812SPI
 from rover_interfaces.msg import LEDMessage
 # -------------------------------------------------------------------------------------------------------------------------------
 # mit ros2 interface show rover_interfaces/msg/LEDMessage
@@ -106,7 +106,7 @@ class LEDPatternConfig:
         self.callback = callback
         self.callback_param = callback_param
         if self.led_type == "WS2812":
-            self.led = WS2812()
+            self.led = WS2812SPI()
 
 #------------------------------------------------------------------------------------------------------------# der eigentliche LEDNode
 # generischer Aufbau, der Publisher für ein LEDMuster, kann entweder sich auf 
@@ -152,6 +152,20 @@ DurationON:     {self.led_default_duration_on},
 DurationOFF:    {self.led_default_duration_off},
 """)
         self.pattern = {
+            LEDPattern.STOP: LEDPatternConfig(LEDPattern.STOP, 
+                "STOP", 
+                duration=0, 
+                timeout=0, 
+                callback='stop', 
+                callback_param={
+                    "color":(0, 0, 0),
+                    "timeout":0, 
+                    "duration_on": 0, 
+                    "duration_off": 0, 
+                    "brightness": 0,
+                    "ledmask" : LEDUtils.combination_mask('ALL')
+                }
+            ),
             LEDPattern.RED: LEDPatternConfig(LEDPattern.RED, 
                 "FILL RED", 
                 duration=0, 
@@ -270,6 +284,36 @@ DurationOFF:    {self.led_default_duration_off},
                     "ledmask" : LEDUtils.combination_mask('ALL')
                 }
             ),             
+            LEDPattern.ROVER_BOOT1: LEDPatternConfig(LEDPattern.ROVER_BOOT1, 
+                "ROVER_BOOT1", 
+                duration=0, 
+                timeout=0, 
+                callback='circle', 
+                callback_param={
+                    "color":(10, 10, 255),
+                    "timeout":self.led_default_timeout, 
+                    "duration_on": 50, 
+                    "duration_off": 25, 
+                    "brightness": self.led_default_brightness,
+                    # cooler Trick, ich steuer die linken Ringe komplett an schränke aber über den zweiten Parameter
+                    # die tatsächlcihen LEDs ein. in dem Fall sind es jeweils LED3,4,5
+                    "ledmask" : LEDUtils.combination_mask('ALL')
+                }
+            ), 
+            LEDPattern.ROVER_BOOT2: LEDPatternConfig(LEDPattern.ROVER_BOOT2, 
+                "ROVER_BOOT2", 
+                duration=0, 
+                timeout=0, 
+                callback='circle', 
+                callback_param={
+                    "color":(50, 255, 70),
+                    "timeout":self.led_default_timeout, 
+                    "duration_on": 50, 
+                    "duration_off": 25, 
+                    "brightness": self.led_default_brightness,
+                    "ledmask" : 0b0 # bei circle wird keine ledmask genutzt
+                }
+            ), 
         }
 
         self.subscription = self.create_subscription(
@@ -282,10 +326,27 @@ DurationOFF:    {self.led_default_duration_off},
         self.get_logger().info('LEDNode gestartet')
 
     def _param_override(self, msg_value, default_value):
-        return msg_value if msg_value > 0 else default_value
+        return msg_value if msg_value >= 0 else default_value
+
+    def validate_led_pattern(self, pattern_id: int) -> int:
+        """
+        Prüft, ob pattern_id ein gültiger Wert der LEDPattern-Enum ist.
+        
+        :param pattern_id: Integer-Wert, der überprüft werden soll
+        :return: Gültige pattern_id oder 0, falls ungültig
+        """
+        try:
+            LEDPattern(pattern_id)
+            return pattern_id
+        except ValueError:
+            return 0
 
     def led_callback(self, msg):
-        pattern_id = LEDPattern(msg.pattern)  # kommt vom Publisher
+        #
+        # ist die empfangene patternID eine valide ID? Wenn nein wird 0 angenommen
+        pattern_id = self.validate_led_pattern(msg.pattern)
+        pattern_id = LEDPattern(pattern_id)  # kommt vom Publisher
+
         # das LEDPatternConfog-Object wird benötigt um die tatsächlich konfigurierten Parameter
         # auszulesen. diese werden dann im eigentlichen Callback übergeben
         obj = self.pattern[pattern_id]
@@ -301,6 +362,8 @@ DurationOFF:    {self.led_default_duration_off},
         # getattr liest aus, welche Attribute ein objekt besitzt. In unserem Fall benötigen wir den Inhalt
         # des Callback-Attributes.
         # Hier steht der Methodenname drin, der aufgerufen werden soll.
+        # config.led entspricht dem LED-Type (z.B WS2812)
+
         method = getattr(config.led, config.callback, None)
         #
         if method is None:
@@ -321,7 +384,11 @@ DurationOFF:    {self.led_default_duration_off},
             f"Aktiviere Pattern {config.pattern_name} \n\t{config.callback} mit Parametern {params} LEDMaskBitPattern: {bin(params['ledmask'])}"
         )
         # das ist der eigentliche Methoden-Aufruf mit übergabe der Parameter.
+
         method(**params)
+        self.get_logger().info(
+            f"[method(**params)]: Call {config.led} Mask:{bin(params['ledmask'])}"
+        )
 
 def main(args=None):
     rclpy.init(args=args)

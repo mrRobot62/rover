@@ -22,12 +22,16 @@ odom_node:
 
 sensor_node:
   ros__parameters:
+    battery_sensor_active: false
     battery_topic: "/battery"
     battery_sensor_gain: 1.0
     battery_critical: 13.1
     battery_low: 13.4
     battery_full: 16.2
     
+    mpu6500_sensor_active: false
+    mpu6500_imu_topic: "/imu"
+
 led_node:
   ros__parameters:
     led_topic: "/led"
@@ -38,6 +42,9 @@ led_node:
     led_default_duration_on: 500
     led_default_duration_off: 500
     
+vision_node:
+  ros__parameters:
+    vison_topic: "/vision/result"
 
 # ------------------------------------------------------
 # der verwendete Lidar soll generisch eingebunden werden

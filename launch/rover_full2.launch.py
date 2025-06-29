@@ -7,6 +7,9 @@ from ament_index_python.packages import get_package_share_directory
 from launch.conditions import IfCondition
 from launch.actions import OpaqueFunction
 from launch.substitutions import TextSubstitution
+from launch.actions import TimerAction
+from launch.event_handlers import OnShutdown
+from launch.actions import RegisterEventHandler, ExecuteProcess
 
 import launch.logging
 
@@ -27,6 +30,13 @@ def generate_launch_description():
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
     params_file = os.path.join(share_dir, 'config', 'rover.yaml')
 
+    # Liste der Lifecycle-Nodes (name, executable)
+    lifecycle_nodes = [
+        ('odom_node', 'odom_node'),
+        ('sensor_node', 'sensor_node'),
+        ('vision_node', 'vision_node')
+    ]
+
     lidar_model_arg = DeclareLaunchArgument(
         'lidar_model',
         default_value='ydlidar',
@@ -37,6 +47,21 @@ def generate_launch_description():
         'use_rviz',
         default_value='true',
         description='RViz starten oder nicht'
+    )
+
+    lidar_model = LaunchConfiguration('lidar_model')
+    lidar_topic = LaunchConfiguration('lidar_topic', default='/scan')
+
+    sensor_node = LifecycleNode(
+        package='rover',
+        executable='sensor_node',
+        name='sensor_node',
+        output='screen',
+        namespace='/',
+        parameters=[
+            LaunchConfiguration('params_file'),
+            {'lidar_topic': lidar_topic}
+        ]
     )
 
     # wird nur dann benötigt, wenn ich direkt ein Node erstellen möchte
@@ -51,34 +76,6 @@ def generate_launch_description():
         params = load_rover_params(params_file, model)
 
         nodes = []
-
-        # 📡 Sensor Node
-        lidar_topic = params.get('lidar_topic', '/scan')
-        sensor_node = LifecycleNode(
-            package='rover',
-            executable='sensor_node',
-            name='sensor_node',
-            output='screen',
-            namespace='/',
-            #parameters=[LaunchConfiguration('params_file')]
-            parameters=[
-                params_file, 
-                {'lidar_topic': TextSubstitution(text=lidar_topic)}
-            ]
-        )
-
-
-        # sensor_node = Node(
-        #     package='rover',
-        #     executable='sensor_node',
-        #     name='sensor_node',
-        #     output='screen',
-        #     parameters=[{
-        #         'lidar_topic': TextSubstitution(text=lidar_topic)
-        #     }]
-        # )
-
-        nodes.append(sensor_node)
 
         if model == 'ydlidar':
             logger.info("Create YDLidar Node -> [{params}]")
@@ -238,50 +235,34 @@ def generate_launch_description():
     #--------------------------------------------------------------------------------------
     # LifeCycle Nodes und Management
     #--------------------------------------------------------------------------------------
-    # 🔄 Odometrie Node (als LifecycleNode)
-    odom_node = LifecycleNode(
-        package='rover',
-        executable='odom_node',
-        name='odom_node',
-        output='screen',
-        namespace='/',
-        #parameters=[LaunchConfiguration('params_file')]
-        parameters=[params_file]
-    )
+    lifecycle_node_definitions = GroupAction([
+        LogInfo(msg='[Launch] Starte LifecycleNodes...'),
+        LifecycleNode(
+            package='rover',
+            executable='sensor_node',
+            name='sensor_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_file]
+        ),
+        LifecycleNode(
+            package='rover',
+            executable='odom_node',
+            name='odom_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_file]
+        ),
+        LifecycleNode(
+            package='rover',
+            executable='vision_node',
+            name='vision_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_file]
+        ),
+    ])
 
-    # 🎥 Vision Node
-    # vision_node = Node(
-    #     package='rover',
-    #     executable='vision_node',
-    #     name='vision_node',
-    #     output='screen',
-    #     #parameters=[LaunchConfiguration('params_file')]
-    #     parameters=[params_file]
-    # )
-    vision_node = LifecycleNode(
-        package='rover',
-        executable='vision_node',
-        name='vision_node',
-        output='screen',
-        namespace='/',
-        #parameters=[LaunchConfiguration('params_file')]
-        parameters=[params_file]
-    )
-
-
-    # ⚙️ Lifecycle Manager für den odom_node
-    lifecycle_manager = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_odom',
-        output='screen',
-        parameters=[{
-            'autostart': True,
-            'node_names': ['sensor_node', 'odom_node', 'vision_node'],
-            'bond_timeout': 0.0
-        }]
-    )
-    # 🧾 Lifecycle Marker Node (zeigt den Zustand von LifeCycle Nodes an in RViz an)
     lifecycle_status_marker_node = Node(
         package='rover',
         executable='lifecycle_status_marker',
@@ -318,25 +299,95 @@ def generate_launch_description():
     # 📦 Gruppenbildung - 
     core_nodes = GroupAction([
         LogInfo(msg='[Launch] Starte Sensorik und Steuerung...'),
-        #sensor_node ----> sensor_node wird im Rahmen des create_lidar mit kreiert
+        led_node,
         tf2_world_node,
         tf2_base_link_node,
-        led_node,
-        OpaqueFunction(function=create_driver_controller_node),  # <== ersetzt den alten driver_controller_node
-        odom_node,
+        OpaqueFunction(function=create_driver_controller_node),  # <== ersetzt den alten driver_controller_node,
         gamepad_nodes
     ])
 
     nav_vision_nodes = GroupAction([
         LogInfo(msg='[Launch] Starte Navigation und Vision...'),
         navigation_node,
-        vision_node
     ])
+
+
+    # Lifecycle-Steuerung (Configure + Activate + Shutdown)
+    lifecycle_startup = []
+    lifecycle_shutdown = []
+    base_delay = 3.0
+    step = 0.5
+    shutdown_step = 1.0
+
+    for idx, (name, _) in enumerate(lifecycle_nodes):
+        delay_config = base_delay + idx * step
+        delay_activate = delay_config + 2.0
+        shutdown_delay1 = idx * shutdown_step
+        shutdown_delay2 = shutdown_delay1 + shutdown_step
+
+        # Configure
+        lifecycle_startup.append(
+            TimerAction(
+                period=delay_config,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{name}', 'configure'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+
+        # Activate
+        lifecycle_startup.append(
+            TimerAction(
+                period=delay_activate,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{name}', 'activate'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+
+        # Shutdown: Deactivate → Shutdown
+        lifecycle_shutdown.append(
+            TimerAction(
+                period=shutdown_delay1,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{name}', 'deactivate'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+
+        lifecycle_shutdown.append(
+            TimerAction(
+                period=shutdown_delay2,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{name}', 'shutdown'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+    # --- END FOR ----------------------------------------------------------------------
+
+
+    # EventHandler für OnShutdown
+    lifecycle_shutdown_handler = RegisterEventHandler(
+        OnShutdown(on_shutdown=lifecycle_shutdown)
+    )
+
  
-    lifecycle_nodes = GroupAction([
-        LogInfo(msg='[Launch] Initialisiere Lifecycle Manager...'),
-        lifecycle_manager,
-        lifecycle_status_marker_node
+    lifecycle_nodes_group = GroupAction([
+        LogInfo(msg='[Launch] Initialisiere Lifecycle-Aktionen...'),
+        lifecycle_status_marker_node,
+        *lifecycle_startup
     ])
 
     logo = """
@@ -359,9 +410,11 @@ def generate_launch_description():
         lidar_model_arg,
         rviz_load_arg,
         params_file_arg,
-        OpaqueFunction(function=create_lidar_node, opaque=True), # inkl. sensor_node
+        OpaqueFunction(function=create_lidar_node),
         core_nodes,
+        lifecycle_node_definitions,
         nav_vision_nodes,
-        lifecycle_nodes,
+        lifecycle_nodes_group,
+        lifecycle_shutdown_handler,    
         OpaqueFunction(function=create_nodes_from_arguments)
     ])

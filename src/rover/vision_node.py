@@ -26,8 +26,12 @@ class VisionNode(LifecycleNode):
         self.declare_parameter('camera_topic', '/camera/image_raw')
         self.camera_topic = self.get_parameter('camera_topic').get_parameter_value().string_value
 
+        self.declare_parameter('vision_topic', '/vision/result')
+        self.vision_topic = self.get_parameter('vision_topic').get_parameter_value().string_value
+
+
         # Publisher vorbereiten (noch nicht aktiv)
-        self.odom_publisher = self.create_lifecycle_publisher(Image, self.camera_topic, 10)
+        self.result_publisher = self.create_lifecycle_publisher(String, self.vision_topic, 10)
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -41,6 +45,8 @@ class VisionNode(LifecycleNode):
             self.image_callback,
             10
         )
+        self.get_logger().info(f"[VisionNode] subscription on '{self.camera_topic}'")
+        self.get_logger().info(f"[VisionNode] publish result on '{self.vision_topic}'")
 
         # Publisher aktivieren
         self.result_publisher.on_activate(state)
@@ -71,7 +77,8 @@ class VisionNode(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info('[VisionNode] on_shutdown()')
+        if rclpy.ok():
+            self.get_logger().info(f"[{self.node_name}] on_shutdown")
         return TransitionCallbackReturn.SUCCESS
 
     def image_callback(self, msg: Image):
@@ -90,29 +97,14 @@ def main(args=None):
 
     try:
         executor.spin()
+    except KeyboardInterrupt:
+        pass
     finally:
+        node.get_logger().info("Node wird beendet...")
         node.destroy_node()
-        rclpy.shutdown()
+        # ⚠️ Shutdown nur, wenn Kontext nicht schon heruntergefahren!
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-# import rclpy
-# from rclpy.node import Node
-
-# class VisionNode(Node):
-#     def __init__(self):
-#         super().__init__('vision_node')
-#         self.get_logger().info('VisionNode gestartet')
-
-# def main(args=None):
-#     rclpy.init(args=args)
-#     node = VisionNode()
-#     rclpy.spin(node)
-#     node.destroy_node()
-#     rclpy.shutdown()

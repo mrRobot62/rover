@@ -1,3 +1,18 @@
+# Rover-LED WS2812
+
+## Installation
+`pip install adafruit-blinka rpi_ws281x --break-system-packages`
+
+In /boot/firmware/config.txt:
+`dtoverlay=pio`
+
+Für ältere Pis: (PI4, 3, ...)
+In /boot/config.txt
+`dtoverlay=pwm-2chan`
+
+Anschließend `sudo reboot`
+
+
 # led_node
 Dieser Node ist dafür verantwortlich die LED-Ringe (4 Stüch á 7 LEDs) geziehlt anzusteuern. Die Reihenfolge der LED-Ringe ist wie folgt
 - Ring 1 = Links hinten (LH)
@@ -111,3 +126,47 @@ keine Anpassung notwendig
 ## class WS2812 anpassen
 wenn man tatsächlich ein komplett neues Muster implementieren möchte, muss dies hier in dieser Klasse implementiert werden, analog zu `fill` und `blink`.
 Der Name der Funktion ist dann auch der name der als callback-funktion genutzt werden muss.
+
+
+# Test
+zwei Terminal-Fenster öffnen
+
+**Terminal 1 - Rover-Projekt starten**
+``
+
+**Response aus Beispiel 1**
+` `
+
+**Response aus Beispiel 2**
+` `
+
+**Response aus Beispiel 3**
+` `
+
+**Response aus Beispiel 4**
+` `
+
+**Response aus Beispiel 5**
+` `
+
+
+**Terminal 2 - Testnachrichten in /led publishen**
+
+**Beispiel 1**: Pattern 1 (GREEN), Timeout 5000, Duration 1000, LEDmask: default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812', timeout: 5000, duration_on: 1000}" --once`
+
+**Beispiel 2**: Pattern  (0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+
+**Beispiel 2**: Pattern  (0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+
+**Beispiel 3**: Pattern  (0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+
+**Beispiel 4**: Pattern  (0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+
+**Beispiel 5**: Pattern  (0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+

@@ -131,42 +131,62 @@ Der Name der Funktion ist dann auch der name der als callback-funktion genutzt w
 # Test
 zwei Terminal-Fenster öffnen
 
-**Terminal 1 - Rover-Projekt starten**
-``
+## Terminal 1 - Rover-Projekt starten**
+`ros2 launch rover rover_full2.launch.py params-file:=install/rover/share/rover/config/rover.yaml lidar_model:=ydlidar use_rviz:=false`
 
 **Response aus Beispiel 1**
-` `
+```
+[led_node-2] [INFO] [1751396650.542946130] [led_node]: Aktiviere Pattern FILL GREEN 
+[led_node-2] 	fill mit Parametern {'color': (0, 255, 0), 'timeout': 5000, 'duration_on': 1000, 'duration_off': 0, 'brightness': 0.0, 'ledmask': 0} LEDMaskBitPattern: 0b0
+[led_node-2] [INFO] [1751396650.544796572] [led_node]: [method(**params)]: Call <rover.hardware.ws2812_driver.WS2812SPI object at 0xffff5aee2090> Mask:0b0
+```
 
 **Response aus Beispiel 2**
-` `
+hier bitte beachtn timeout, duration_on und _off stehen auf 0, das bedeutet es werden default werden genutzt. Zur Anzeige wird die Nachricht gebracht. Zum setzen der Defaultwerte ist led_node verantwortlich nicht der Publisher.
+
+```
+[led_node-2] [INFO] [1751396726.992928073] [led_node]: Aktiviere Pattern FILL RED 
+[led_node-2] 	fill mit Parametern {'color': (0, 255, 0), 'timeout': 0, 'duration_on': 0, 'duration_off': 0, 'brightness': 0.0, 'ledmask': 0} LEDMaskBitPattern: 0b0
+[led_node-2] [INFO] [1751396726.994566885] [led_node]: [method(**params)]: Call <rover.hardware.ws2812_driver.WS2812SPI object at 0xffff5aee2090> Mask:0b0
+```
 
 **Response aus Beispiel 3**
-` `
-
+```
+[led_node-2] 	fill mit Parametern {'color': (0, 255, 0), 'timeout': 0, 'duration_on': 0, 'duration_off': 0, 'brightness': 0.0, 'ledmask': 51} LEDMaskBitPattern: 0b110011
+[led_node-2] [INFO] [1751397090.396050013] [led_node]: [method(**params)]: Call <rover.hardware.ws2812_driver.WS2812SPI object at 0xffff5aee2090> Mask:0b110011
+```
 **Response aus Beispiel 4**
-` `
+```
+[led_node-2] [INFO] [1751397255.680740976] [led_node]: Aktiviere Pattern BLINK LEFT 
+[led_node-2] 	blink mit Parametern {'color': (255, 165, 0), 'timeout': 0, 'duration_on': 0, 'duration_off': 0, 'brightness': 0.0, 'ledmask': 0} LEDMaskBitPattern: 0b0
+[led_node-2] [INFO] [1751397255.682436900] [led_node]: [method(**params)]: Call <rover.hardware.ws2812_driver.WS2812SPI object at 0xffff5af72e40> Mask:0b0
+```
 
 **Response aus Beispiel 5**
-` `
+```
+[led_node-2] [INFO] [1751397396.506221495] [led_node]: Aktiviere Pattern HAZARD 
+[led_node-2] 	blink mit Parametern {'color': (255, 165, 0), 'timeout': 0, 'duration_on': 0, 'duration_off': 0, 'brightness': 0.0, 'ledmask': 0} LEDMaskBitPattern: 0b0
+[led_node-2] [INFO] [1751397396.508039179] [led_node]: [method(**params)]: Call <rover.hardware.ws2812_driver.WS2812SPI object at 0xffff5af73260> Mask:0b0
+```
 
-
-**Terminal 2 - Testnachrichten in /led publishen**
+## **Terminal 2 - Testnachrichten in /led publishen**
 
 **Beispiel 1**: Pattern 1 (GREEN), Timeout 5000, Duration 1000, LEDmask: default, --once 1 nachricht
 `ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812', timeout: 5000, duration_on: 1000}" --once`
 
-**Beispiel 2**: Pattern  (0) (red), alles default, --once 1 nachricht
+**Beispiel 2**: Pattern  0) (red), alles default, --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 0, ledtype: 'WS2812'}" --once`
+
+**Beispiel 3**: Pattern  (1) (red), alles default, ledmask setzen., --once 1 nachricht
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812', ledmask: 0b0110011}" --once`
+
+**Beispiel 4**: Pattern  (10) blinken links, es sollten nur 3 LEDs im Ring blinken
+`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 10, ledtype: 'WS2812'}" --once`
+
+**Beispiel 5**: Pattern  (12) Warnblink - es sollte der Ring blinken
 `ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
 
-**Beispiel 2**: Pattern  (0) (red), alles default, --once 1 nachricht
-`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
+Weitere Tests im eigenen Ermessen.
 
-**Beispiel 3**: Pattern  (0) (red), alles default, --once 1 nachricht
-`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
-
-**Beispiel 4**: Pattern  (0) (red), alles default, --once 1 nachricht
-`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
-
-**Beispiel 5**: Pattern  (0) (red), alles default, --once 1 nachricht
-`ros2 topic pub /led rover_interfaces/msg/LEDMessage "{pattern: 1, ledtype: 'WS2812'}" --once`
-
+# Bekannte Fehler 
+- Wenn im terminal-Fenster ein Fehler auftritt (dann, wenn man ein ungültiges Pattern angibt, stürzt aktuell led_node ab). Man muss dann das Projekt beenden (CTRL-C) und neustarten

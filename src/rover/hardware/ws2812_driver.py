@@ -274,6 +274,11 @@ class WS2812SPI:
         print (f"ws2812.clear((0,0,0))")
         self.fill()
 
+    #
+    # Wrapper zum Abschalten aller LEDs, kann vom Publisher genutzt werden
+    def off(self, color=(0,0,0), timeout=0, duration_on=0, durattion_off=0, **kwargs):
+        self.clear()
+        self.stop()
 
     def stop(self):
         """

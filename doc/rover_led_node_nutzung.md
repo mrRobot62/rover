@@ -100,3 +100,9 @@ Führt ein Muster durch, sequenziell nach einander für alle Ringe (1-4)
 
 ## circle()
 Lauflicht für  alle LEDs in allen WS2812-Ringen (Ringe 1-4). Grundsätzlich ist LED1 (Bit0) nicht inbegriffen. 
+
+
+
+# Bekannte Fehler
+- run() und circle() haben noch keine wirklich optimale Implementierung.
+- Wird ein unbekannter LEDPattern angegeben vom Publisher crashed led_node

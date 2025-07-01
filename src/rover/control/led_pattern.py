@@ -60,6 +60,6 @@ class LEDPattern(Enum):
 
 
     UNKNOWN_ERROR = 1000
-    STOP = 9999
+    OFF = 9999
 
 

@@ -152,18 +152,18 @@ DurationON:     {self.led_default_duration_on},
 DurationOFF:    {self.led_default_duration_off},
 """)
         self.pattern = {
-            LEDPattern.STOP: LEDPatternConfig(LEDPattern.STOP, 
-                "STOP", 
+            LEDPattern.OFF: LEDPatternConfig(LEDPattern.OFF, 
+                "OFF", 
                 duration=0, 
                 timeout=0, 
-                callback='stop', 
+                callback='off', 
                 callback_param={
-                    "color":(0, 0, 0),
-                    "timeout":0, 
-                    "duration_on": 0, 
-                    "duration_off": 0, 
-                    "brightness": 0,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
+                    "color":None,
+                    "timeout": None,
+                    "duration_on": None,
+                    "duration_off": None,
+                    "ledmask" : 0b0,
+                    "brightness": 0
                 }
             ),
             LEDPattern.RED: LEDPatternConfig(LEDPattern.RED, 
@@ -339,6 +339,7 @@ DurationOFF:    {self.led_default_duration_off},
             LEDPattern(pattern_id)
             return pattern_id
         except ValueError:
+            self.get_logger().warn(f"Publisher nutzt eine ungültige LEDPatternID: {pattern_id}")
             return 0
 
     def led_callback(self, msg):

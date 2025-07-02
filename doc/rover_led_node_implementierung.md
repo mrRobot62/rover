@@ -1,17 +1,5 @@
 # Rover-LED WS2812
 
-## Installation
-`pip install adafruit-blinka rpi_ws281x --break-system-packages`
-
-In /boot/firmware/config.txt:
-`dtoverlay=pio`
-
-Für ältere Pis: (PI4, 3, ...)
-In /boot/config.txt
-`dtoverlay=pwm-2chan`
-
-Anschließend `sudo reboot`
-
 
 # led_node
 Dieser Node ist dafür verantwortlich die LED-Ringe (4 Stüch á 7 LEDs) geziehlt anzusteuern. Die Reihenfolge der LED-Ringe ist wie folgt

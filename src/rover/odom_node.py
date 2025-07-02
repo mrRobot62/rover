@@ -6,7 +6,6 @@ from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecyclePublisher
-from rclpy.executors import SingleThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav_msgs.msg import Odometry

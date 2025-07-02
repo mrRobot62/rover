@@ -256,25 +256,34 @@ def generate_launch_description():
         parameters=[params_file]
     )
 
-
-    # ⚙️ Lifecycle Manager für den odom_node
-    lifecycle_manager = TimerAction(
-        period=3.0,  # ⏱️ 3 Sekunden Verzögerung
-        actions=[
-            Node(
-                package='nav2_lifecycle_manager',
-                executable='lifecycle_manager',
-                name='lifecycle_manager_odom',
-                output='screen',
-                parameters=[{
-                    'autostart': True,
-#                    'node_names': [ 'sensor_node','odom_node', 'vision_node'],
-                    'node_names': [ 'odom_node'],
-                    'bond_timeout': 1.0
-                }]
-            )
-        ]
+    i2c_node = LifecycleNode(
+        package='rover',
+        executable='i2c_node',
+        name='i2c_node',
+        output='screen',
+        namespace='/',
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_file]
     )
+
+#     # ⚙️ Lifecycle Manager für den odom_node
+#     lifecycle_manager = TimerAction(
+#         period=3.0,  # ⏱️ 3 Sekunden Verzögerung
+#         actions=[
+#             Node(
+#                 package='nav2_lifecycle_manager',
+#                 executable='lifecycle_manager',
+#                 name='lifecycle_manager_odom',
+#                 output='screen',
+#                 parameters=[{
+#                     'autostart': True,
+# #                    'node_names': [ 'sensor_node','odom_node', 'vision_node'],
+#                     'node_names': [ 'odom_node'],
+#                     'bond_timeout': 1.0
+#                 }]
+#             )
+#         ]
+#     )
 
     lifecycle_status_marker_node = Node(
         package='rover',

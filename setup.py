@@ -37,6 +37,7 @@ setup(
             'lifecycle_node1=rover.lifecycle_node1:main',
             'lifecycle_node2=rover.lifecycle_node2:main',
             'led_node = rover.led_node:main',
+            'i2c_node = rover.i2c_node:main',
             'lifecycle_dashboard = rover.lifecycle_dashboard:main',
             #'lifecycle_manager = rover.lifecycle_manager:main',
             'lifecycle_status_marker = rover.lifecycle_status_marker:main', 

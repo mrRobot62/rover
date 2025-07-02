@@ -32,6 +32,7 @@ def generate_launch_description():
 
     # Liste der Lifecycle-Nodes (name, executable)
     lifecycle_nodes = [
+        ('i2c_node', 'i2c_node'),
         ('odom_node', 'odom_node'),
         ('sensor_node', 'sensor_node'),
         ('vision_node', 'vision_node')
@@ -261,6 +262,14 @@ def generate_launch_description():
             namespace='/',
             parameters=[params_file]
         ),
+        LifecycleNode(
+            package='rover',
+            executable='i2c_node',
+            name='i2c_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_file]
+        ),
     ])
 
     lifecycle_status_marker_node = Node(
@@ -313,6 +322,12 @@ def generate_launch_description():
 
 
     # Lifecycle-Steuerung (Configure + Activate + Shutdown)
+    #
+    # Dieses verfahren habe ich gewählt, weil ich nav2_lifecycle_manager nicht zum Laufen gebracht habe
+    # die Transitionsübergänge haben nie automatisch funktioniert sondern immer nur manuell
+    # Das führte dazu, das beim Start des roverprojektes die LifeCycleNotes nie im active-State waren
+    #
+    # Nachfolgend eine einfacher manueller Ansatz der die Statusübergänge automatisiert.
     lifecycle_startup = []
     lifecycle_shutdown = []
     base_delay = 3.0
@@ -390,6 +405,8 @@ def generate_launch_description():
         *lifecycle_startup
     ])
 
+    # https://patorjk.com/software/taag/#p=display&f=Slant&t=ROVER%20PROJECT
+    # Font: SLANT, Fitted, default height
     logo = """
     ____   ____  _____ ___      ____   ____  _    __ ______ ____ 
    / __ \ / __ \/ ___/|__ \    / __ \ / __ \| |  / // ____// __ \ 
@@ -404,6 +421,15 @@ def generate_launch_description():
                    /___/                                         
 """
 
+    ready = """
+                           __      
+   _____ ___   ____ _ ____/ /__  __
+  / ___// _ \ / __ `// __  // / / /
+ / /   /  __// /_/ // /_/ // /_/ / 
+/_/    \___/ \__,_/ \__,_/ \__, /  
+                          /____/   
+"""
+
     # 🔁 Rückgabe der LaunchDescription
     return LaunchDescription([
         LogInfo(msg=[logo, '\n\n']),
@@ -416,5 +442,6 @@ def generate_launch_description():
         nav_vision_nodes,
         lifecycle_nodes_group,
         lifecycle_shutdown_handler,    
-        OpaqueFunction(function=create_nodes_from_arguments)
+        OpaqueFunction(function=create_nodes_from_arguments),
+        LogInfo(msg=['\n',ready, '\n']),
     ])

@@ -46,6 +46,11 @@ vision_node:
   ros__parameters:
     vison_topic: "/vision/result"
 
+i2c_node:
+  ros__parameters:
+    i2c_read_topic : "/i2c/read"
+    i2c_write_topic : "/i2c/write"
+    
 # ------------------------------------------------------
 # der verwendete Lidar soll generisch eingebunden werden
 # Default lidar_model:=ydlidar

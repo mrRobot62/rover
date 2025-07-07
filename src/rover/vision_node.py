@@ -12,12 +12,14 @@ from std_msgs.msg import String
 
 class VisionNode(LifecycleNode):
     def __init__(self):
-        super().__init__('vision_node')
-        self.get_logger().info('VisionNode constructed.')
-
+        self.node_name = self.__class__.__name__
+        super().__init__(self.node_name)
         # Platzhalter für Publisher/Subscriber
         self.image_subscriber = None
         self.result_publisher = None
+
+
+        self.get_logger().info(f"[{self.node_name}] Node im Status unconfigured")
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('[VisionNode] on_configure()')

@@ -109,7 +109,7 @@ def dataModulo(data_vals, factor=100):
     """
     return [int(val * factor) % 65536 for val in data_vals]
 
-def send_packet(bus:smbus2.SMBus, data_vals, cmd, subcmd=0, flags=0):
+def esp32_send_packet(bus:smbus2.SMBus, slave_address, data_vals, cmd, subcmd=0, flags=0):
     """
     Erzeugt ein binäres Paket mit Header, Kommando, Daten und CRC8 und sendet es über den I2C-Bus.
     Wiederholte Pakete mit identischem Inhalt werden nicht erneut gesendet.
@@ -164,7 +164,7 @@ def send_packet(bus:smbus2.SMBus, data_vals, cmd, subcmd=0, flags=0):
     print(f"→ Sende Paket: {[hex(b) for b in packet]}")
 
     try:
-        msg = i2c_msg.write(I2C_ADDRESS, packet)
+        msg = i2c_msg.write(slave_address, packet)
         bus.i2c_rdwr(msg)
         return 0
     except Exception as e:
@@ -184,76 +184,68 @@ def CRC8(data: bytes) -> int:
             crc &= 0xFF
     return crc
 
-class I2CTest():
-    """
-    Hilfsklasse zur Diagnose und Initialisierung des I2C-Busses (Laden von Treibern, Geräteprüfung, etc.).
-    """
-    def __init__(self, i2c_bus=I2C_BUS):
-        self.bus = smbus2.SMBus(i2c_bus)
-        self.logger = launch.logging.get_logger('I2CTest')
-
-    def check_i2c_dev_module(self):
-        """
-        Prüft, ob das Kernelmodul 'i2c_dev' geladen ist. Lädt es ggf. nach.
-        """
-        self.logger("[I2CTest] => Prüfe Kernel-Modul 'i2c_dev'...")
-        result = subprocess.run(["lsmod"], capture_output=True, text=True)
-        if "i2c_dev" in result.stdout:
-            self.logger("✓ i2c_dev Modul geladen")
-        else:
-            self.logger("❌ i2c_dev Modul nicht geladen")
-            subprocess.run(["sudo", "modprobe", "i2c_dev"])
-            self.logger("✓ Modul geladen")
-            return -1
-        return 0
-
-    def check_i2c_device(self):
-        """
-        Prüft, ob das I2C-Gerät im Dateisystem existiert.
-        """
-        self.logger(f"[I2CTest] => Prüfe I2C Device {I2C_BUS}...")
-        if os.path.exists(I2C_BUS):
-            self.logger(f"✓ {I2C_BUS} vorhanden")
-        else:
-            self.logger(f"❌ {I2C_BUS} nicht vorhanden")
-            return -2
-        return 0
-
-    def check_all_i2c_busses(self):
-        """
-        Gibt alle verfügbaren I2C-Geräte im System aus.
-        """
-        self.logger("[I2CTest] => Gefundene I2C Busse:")
-        os.system("ls /dev/i2c-*")
-        return 0
-
-    def run_i2cdetect(self):
-        """
-        Führt das Kommandozeilen-Tool `i2cdetect` aus und prüft, ob der ESP32 erreichbar ist.
-        """
-        self.logger(f"[I2CTest] => Starte i2cdetect auf {I2C_BUS}...")
-        result = subprocess.run(["i2cdetect", "-y", "1"], capture_output=True, text=True)
-        self.logger(result.stdout)
-        if I2C_ADDRESS in result.stdout:
-            self.logger(f"✓ ESP32 gefunden bei Adresse {I2C_ADDRESS}")
-        else:
-            self.logger(f"❌ Kein Gerät bei Adresse {I2C_ADDRESS} gefunden")
-            return -3
-        return 0
-
 class SingletonI2CBus:
     """
     Singleton-Wrapper für den I2C-Bus. Stellt sicher, dass nur eine Bus-Instanz existiert.
+
+    smbus2.SMBus – Methodenübersicht
+
+    | Methode                               | Beschreibung                                                      |
+    |---------------------------------------|-------------------------------------------------------------------|
+    | open(bus)                             | Öffnet den angegebenen I2C-Bus                                    |
+    | close()                               | Schließt die Verbindung zum I2C-Bus                               |
+    | enable_pec(enable=True)               | Aktiviert oder deaktiviert Packet Error Checking (PEC)            |
+    | write_quick(addr)                     | Führt einen "Quick Write" aus                                     |
+    | read_byte(addr)                       | Liest ein einzelnes Byte vom Slave                                |
+    | write_byte(addr, val)                 | Schreibt ein einzelnes Byte an den Slave                          |
+    | read_byte_data(addr, reg)             | Liest ein Byte von einem bestimmten Register                      |
+    | write_byte_data(addr, reg, val)       | Schreibt ein Byte in ein bestimmtes Register                      |
+    | read_word_data(addr, reg)             | Liest ein 2-Byte-Wort vom angegebenen Register                    |
+    | write_word_data(addr, reg, val)       | Schreibt ein 2-Byte-Wort in ein Register                          |
+    | process_call(addr, reg, val)          | Sendet ein 16-Bit-Wort und erhält direkt eine Antwort             |
+    | read_block_data(addr, reg)            | Liest bis zu 32 Bytes ab einem Register (SMBus Block Read)        |
+    | write_block_data(addr, reg, data).    | Schreibt bis zu 32 Bytes ab einem Register (SMBus Block Write)    |
+    | block_process_call(addr, reg, data).  | Sendet Block und erhält Block-Antwort (SMBus 2.0)                 |
+    | read_i2c_block_data(addr, reg, len).  | Liest len Bytes wie bei I2C-Geräten                               |
+    | write_i2c_block_data(addr, reg, data) | Schreibt Datenblock an I2C-Gerät                                  |
+    | i2c_rdwr(msgs...)                     | Führt komplexe Lese-/Schreiboperationen (kombiniert) aus          |
+
+    Hinweis: Fast alle Methoden besitzen ein optionales Argument 'force', um die Adressverwendung zu erzwingen.
     """
-    _bus_instance = None
+        
+    #_bus_instance = None
+    __bus = {}
+    @classmethod
+    def getBus(cls, i2c_bus_id=I2C_BUS_ID):
+        if i2c_bus_id in cls.__bus:
+            return cls.__bus[i2c_bus_id]
+        else:
+            cls.__bus[i2c_bus_id] = smbus2.SMBus(i2c_bus_id)
+            return cls.__bus[i2c_bus_id]
+        
+    @classmethod
+    def pingSlave(cls, bus: smbus2.SMBus, slave_address: int) -> bool:
+        """ 
+        prüfen ob die Slave-Adresse im Bus vorhanden ist.
+
+        @return True - Slave-Adresse gefunden - ok
+        @return False - Slave-Adresse nicht vorhanden
+        """
+        try:
+            bus.write_quick(slave_address)
+            return True
+        except OSError:
+            return False
 
     @classmethod
-    def getBus(cls, i2c_bus_id=I2C_BUS_ID, i2c_address=I2C_ADDRESS):
-        if cls._bus_instance is None:
-            cls._bus_instance = smbus2.SMBus(i2c_bus_id)
-        return cls._bus_instance
-
-
+    def pingSlave(cls, i2c_bus_id, slave_address: int) -> bool:
+        """ """
+        try:
+            bus = SingletonI2CBus.getBus(i2c_bus_id=i2c_bus_id)
+            bus.write_quick(slave_address)
+            return True
+        except OSError:
+            return False
 
 class ESP32RawDriver(ABC):
     """
@@ -261,10 +253,11 @@ class ESP32RawDriver(ABC):
     Bietet Grundfunktionen für digitale und analoge IO-Kommandos.
     """
     def __init__(self, logger, i2c_bus_id=I2C_BUS_ID, i2c_address=I2C_ADDRESS):
+        self.class_name = self.__class__.__name__
         self.bus = SingletonI2CBus.getBus(i2c_bus_id)
         self.address = i2c_address
         self.logger = logger
-        self.logger.info(getMsg(f"I2CBus ({self.bus}): ' {I2C_BUS}{self.bus.fd}. Slave: {self.address}", '[ESP32RawDriver]'))
+        self.logger.info(f"[{self.class_name}] I2CBus ({self.bus}): '{I2C_BUS}{self.bus.fd}'. Slave: {self.address}")
 
     def digitalWrite(self, pins: List[int] = [0, 0], states: List[int] = [0, 0]):
         """
@@ -276,7 +269,7 @@ class ESP32RawDriver(ABC):
         states = [x if x in (0, 1) else 0 for x in states]
         data = pins + states
         print(f"=> ({data})")
-        return send_packet(self.bus, data_vals=data, cmd=cmd, subcmd=scmd, flags=0x00)
+        return esp32_send_packet(self.bus, slave_address=self.address, data_vals=data, cmd=cmd, subcmd=scmd, flags=0x00)
 
     def digitalRead(self, pins: List[int] = [0, 0]):
         """
@@ -298,7 +291,7 @@ class ESP32RawDriver(ABC):
         pins = [p if 0 <= p <= 50 else 0 for p in pins]
         state = [s if 0 <= s <= 4095 else 0 for s in state]
         data = pins + state
-        return send_packet(self.bus, data_vals=data, cmd=cmd, subcmd=int(scmd), flags=0x00)
+        return esp32_send_packet(self.bus, slave_address=self.address, data_vals=data, cmd=cmd, subcmd=int(scmd), flags=0x00)
 
     def analogRead(self, pins: List[int] = [0, 0]):
         """
@@ -316,10 +309,11 @@ class ServoDriver():
     Nutzt binäre I2C-Kommandos zur Übergabe von Geschwindigkeit, Position, etc.
     """
     def __init__(self, logger, i2c_bus_id=I2C_BUS_ID, i2c_address=I2C_ADDRESS):
+        self.class_name = self.__class__.__name__
         self.bus = SingletonI2CBus.getBus(i2c_bus_id)
         self.address = i2c_address
         self.logger = logger
-        self.logger.info(getMsg(f"I2CBus ({self.bus}): ' {I2C_BUS}{self.bus.fd}. Slave: {self.address}",'[ServoDriver]' ))
+        self.logger.info(getMsg(f"[{self.class_name}] I2CBus ({self.bus}): ' {I2C_BUS}{self.bus.fd}. Slave: {self.address}",'[ServoDriver]' ))
 
     def write(self, cmd: CommandID, scmd: SubCommandID, servo_data: dict, force=False):
         """
@@ -328,9 +322,72 @@ class ServoDriver():
         """
         if cmd == CommandID.SERVO_WRITE:
             data = dataModulo(data_vals=servo_data, factor=100)
-            rc = send_packet(self.bus, data_vals=data, cmd=cmd.value, subcmd=scmd.value, flags=0x00)
+            rc = esp32_send_packet(self.bus, slave_address=self.address, data_vals=data, cmd=cmd.value, subcmd=scmd.value, flags=0x00)
             self.logger.debug(getMsg(f"\t{cmd}:{scmd} Data:{servo_data}", '[ServoDriver]'))
             return rc
 
         self.logger.error(getMsg(f"::write aber cmd={cmd} - Fehler", '[ServoDriver]'))
         return 1
+
+    def read(self, cmd: CommandID, scmd: SubCommandID, servo_data: dict, force=False):
+
+        return servo_data
+
+
+
+# class I2CTest():
+#     """
+#     Hilfsklasse zur Diagnose und Initialisierung des I2C-Busses (Laden von Treibern, Geräteprüfung, etc.).
+#     """
+#     def __init__(self, i2c_bus=I2C_BUS):
+#         self.bus = smbus2.SMBus(i2c_bus)
+#         self.logger = launch.logging.get_logger('I2CTest')
+
+#     def check_i2c_dev_module(self):
+#         """
+#         Prüft, ob das Kernelmodul 'i2c_dev' geladen ist. Lädt es ggf. nach.
+#         """
+#         self.logger("[I2CTest] => Prüfe Kernel-Modul 'i2c_dev'...")
+#         result = subprocess.run(["lsmod"], capture_output=True, text=True)
+#         if "i2c_dev" in result.stdout:
+#             self.logger("✓ i2c_dev Modul geladen")
+#         else:
+#             self.logger("❌ i2c_dev Modul nicht geladen")
+#             subprocess.run(["sudo", "modprobe", "i2c_dev"])
+#             self.logger("✓ Modul geladen")
+#             return -1
+#         return 0
+
+#     def check_i2c_device(self):
+#         """
+#         Prüft, ob das I2C-Gerät im Dateisystem existiert.
+#         """
+#         self.logger(f"[I2CTest] => Prüfe I2C Device {I2C_BUS}...")
+#         if os.path.exists(I2C_BUS):
+#             self.logger(f"✓ {I2C_BUS} vorhanden")
+#         else:
+#             self.logger(f"❌ {I2C_BUS} nicht vorhanden")
+#             return -2
+#         return 0
+
+#     def check_all_i2c_busses(self):
+#         """
+#         Gibt alle verfügbaren I2C-Geräte im System aus.
+#         """
+#         self.logger("[I2CTest] => Gefundene I2C Busse:")
+#         os.system("ls /dev/i2c-*")
+#         return 0
+
+#     def run_i2cdetect(self):
+#         """
+#         Führt das Kommandozeilen-Tool `i2cdetect` aus und prüft, ob der ESP32 erreichbar ist.
+#         """
+#         self.logger(f"[I2CTest] => Starte i2cdetect auf {I2C_BUS}...")
+#         result = subprocess.run(["i2cdetect", "-y", "1"], capture_output=True, text=True)
+#         self.logger(result.stdout)
+#         if I2C_ADDRESS in result.stdout:
+#             self.logger(f"✓ ESP32 gefunden bei Adresse {I2C_ADDRESS}")
+#         else:
+#             self.logger(f"❌ Kein Gerät bei Adresse {I2C_ADDRESS} gefunden")
+#             return -3
+#         return 0

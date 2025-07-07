@@ -1,0 +1,13 @@
+ros__parameters:
+  # Allgemeine topics die von allen Nodes genutzt werden können
+  topic_led: '/led'
+  topic_battery: '/battery'
+  topic_imu: '/imu'
+  
+
+  # I2C-Stuff
+  i2c_bus1: 1
+  i2c_bus2: 2
+  # Alle I2C Slaves werden in der common.yaml definiert
+  i2c_esp_adr: 0x12
+  i2c_ads_adr: 0x48

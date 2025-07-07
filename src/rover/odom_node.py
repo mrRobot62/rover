@@ -14,13 +14,16 @@ import math
 
 class OdomNode(LifecycleNode):
     def __init__(self):
-        super().__init__('odom_node')
+        self.node_name = self.__class__.__name__
+        super().__init__(self.node_name)
         self.get_logger().info('OdomNode constructed.')
         self.callback_group = ReentrantCallbackGroup()
 
         self.odom_publisher = None
         self.timer = None
         self.counter = 0  # Für Dummy-Odometrie
+
+        self.get_logger().info(f"[{self.node_name}] Node im Status unconfigured")
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('[OdomNode] on_configure()')

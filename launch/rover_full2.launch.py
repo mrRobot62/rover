@@ -29,6 +29,9 @@ def generate_launch_description():
     rviz_config_file = os.path.join(share_dir, 'config/rviz', 'rover.rviz')
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
     params_file = os.path.join(share_dir, 'config', 'rover.yaml')
+    params_sensor_node = os.path.join(share_dir, 'config', 'sensor_node.yaml')
+    params_common_file = os.path.join(share_dir, 'config', 'rover_common.yaml')
+
 
     # Liste der Lifecycle-Nodes (name, executable)
     lifecycle_nodes = [
@@ -244,7 +247,7 @@ def generate_launch_description():
             name='sensor_node',
             output='screen',
             namespace='/',
-            parameters=[params_file]
+            parameters=[params_file, params_sensor_node]
         ),
         LifecycleNode(
             package='rover',
@@ -421,14 +424,6 @@ def generate_launch_description():
                    /___/                                         
 """
 
-    ready = """
-                           __      
-   _____ ___   ____ _ ____/ /__  __
-  / ___// _ \ / __ `// __  // / / /
- / /   /  __// /_/ // /_/ // /_/ / 
-/_/    \___/ \__,_/ \__,_/ \__, /  
-                          /____/   
-"""
 
     # 🔁 Rückgabe der LaunchDescription
     return LaunchDescription([
@@ -443,5 +438,4 @@ def generate_launch_description():
         lifecycle_nodes_group,
         lifecycle_shutdown_handler,    
         OpaqueFunction(function=create_nodes_from_arguments),
-        LogInfo(msg=['\n',ready, '\n']),
     ])

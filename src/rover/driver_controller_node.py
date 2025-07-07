@@ -5,17 +5,16 @@ from sensor_msgs.msg import Joy
 from enum import Enum
 import time  # am Anfang ergänzen
 from rclpy.parameter import Parameter
-
-
-#from src.rover.hardware.rover_driver import RoverDriver
 from .hardware.rover_driver import RoverDriver
+from rover_interfaces.msg import I2CWrite
+from rover_interfaces.msg import LEDMessage
+from rover_interfaces.srv import I2CReadRequest
+from .control.led_pattern import LEDPattern
 
-#from src.rover.hardware.i2c_driver import I2CTest;
 
 class ESP32_PORTS(Enum):
     LED1=18
     LED2=19
-
 
 class BUTTONS(Enum):
     X=0
@@ -37,37 +36,24 @@ class JOYSTICKS(Enum):
     PAD_LR = 4     # JoyPad
     PAD_UD = 5      # JoyPad
 
-
 class DriverControllerNode(Node):
-
     def __init__(self):
-        super().__init__(
-            'driver_controller_node',
-            automatically_declare_parameters_from_overrides=True
-        )
-        self.js_velocity = JOYSTICKS.LJ_UD.value
-        self.js_steering = JOYSTICKS.LJ_LR.value
-
-        self.led_left = BUTTONS.LB.value
-        self.led_right = BUTTONS.RB.value
-
-        self.rover_driver = RoverDriver(self.get_logger())
-        # Parameter deklarieren mit Default
-        #self.declare_parameter('cmd_vel_topic', '/joy')
-        # self.declare_parameters(
-        # namespace='',
-        # parameters=[
-        #     ('cmd_vel_topic', '/joy'),
-        #     ('log_level', 'INFO'),
-        #     ('reverse_steering', True),
-        #     ('reverse_velocity', False),
-        #     ('map_js_steering', 0),
-        #     ('map_js_velocity', 1),
-        #     ('map_js_cam_lr', 2)
-        # ])
+        super().__init__('driver_controller_node')
+        self.node_name = self.__class__.__name__
+        # Parameter auslesen
+        self.declare_parameters(
+        namespace='',
+        parameters=[
+            ('cmd_vel_topic', '/joy'),
+            ('reverse_steering', True),
+            ('reverse_velocity', False),
+            ('map_js_steering', 0),
+            ('map_js_velocity', 1),
+            ('map_js_cam_turn', 2),
+            ('map_js_cam_tilt', 3),
+        ])
 
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
-        self.log_level = self.get_parameter('log_level').get_parameter_value().string_value
         self.reverse_steering = self.get_parameter('reverse_steering').get_parameter_value().bool_value
         self.reverse_velocity = self.get_parameter('reverse_velocity').get_parameter_value().bool_value
         self.map_js_steering = self.get_parameter('map_js_steering').get_parameter_value().integer_value
@@ -77,25 +63,37 @@ class DriverControllerNode(Node):
 
         self.get_logger().info(
 f"""
-DriverControllerNode config:
+DriverControllerNode(Node) config:\n\
 --------------------------------
-Topic:{self.cmd_vel_topic},
-DebugLevel:         {self.log_level},
-ReverseSteering:    {self.reverse_steering},
-ReverseVelocity:    {self.reverse_velocity},
-MappingSteering:    {self.map_js_steering},
-MappingVelocity:    {self.map_js_velocity},
-MappingCameraTurn:  {self.map_js_cam_turn},
-MappingCameraTilt:  {self.map_js_cam_tilt},
+cmd_vel_topic:          {self.cmd_vel_topic}
+reverse_steering:       {self.reverse_steering}
+reverse_velocity:       {self.reverse_velocity}
+map_js_steering:        {self.map_js_steering}
+map_js_velocity:        {self.map_js_velocity}
+map_js_cam_turn:        {self.map_js_cam_turn}
+map_js_cam_tilt:        {self.map_js_cam_tilt}
 """)
         
-        # Subscriber anlegen (hier für Twist Nachrichten)
+#        self.get_logger().info(f"")
+        self.get_logger().info(f"create publisher für I2CWrite")
+        self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
+        self.get_logger().info(f"create publisher für LEDMessages")
+        self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
+
+        self.js_velocity = JOYSTICKS.LJ_UD.value
+        self.js_steering = JOYSTICKS.LJ_LR.value
+
+        #
+        # teleop-Topic abonnieren
+        self.cmd_vel_topic = self.cmd_vel_topic
+        self.get_logger().info(f"create subscription für JoyStick-Commands")
         self.subscription = self.create_subscription(
-            Joy,   # oder Joy, falls das dein Message-Typ ist
+            Joy,
             self.cmd_vel_topic,
             self.cmd_driver_callback,
             10
         )
+
         self.last_velocity = None
         self.last_steering = None
         self.last_axes = None
@@ -103,140 +101,109 @@ MappingCameraTilt:  {self.map_js_cam_tilt},
         self.MODE = "MANUAL"
         self.toggle_active = False
         self.last_i2c_time = time.monotonic()
-        self.min_interval = 0.05  # mindestens 50ms zwischen zwei I2C-Aufrufen
+        self.min_interval = 0.05
 
-        self.rb_blinking = False
-        self.lb_blinking = False
-        self.rb_led_state = False
-        self.lb_led_state = False
+        self.get_logger().info('DriverControllerNode gestartet.')
 
-        # 500ms Timer für Blinken
-        self.timer = self.create_timer(0.5, self.blink_timer_callback)
-
-        self.get_logger().info(f'DriverControllerNode gestartet. Warte auf {self.cmd_vel_topic}...')
-
-    def blink_timer_callback(self):
+    def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
         """
-        Callback des create_timer(self.blink_timer_callback)
-
         """
+        msg = LEDMessage()
+        msg.pattern = pattern_id
+        msg.ledtype = "WS2812"
+        msg.timeout = timeout
+        msg.duration = 0
+        msg.duration_on = duration_on
+        msg.duration_off = duration_off
+        msg.brightness = 1.0
+        msg.ledmask = ledmask
+        self.led_pub.publish(msg)
+        self.get_logger().info(f'LED Pattern {pattern_id} gesendet')
 
-        if self.rb_blinking and self.lb_blinking:
-            self.lb_led_state = not self.lb_led_state
-            self.rb_led_state = not self.rb_led_state
-            self.get_logger().info(f"LB-State: {self.lb_led_state} RB-STATE: {self.rb_led_state}")
-            self.rover_driver.digitalWrite(
-                [ESP32_PORTS.LED1.value, ESP32_PORTS.LED2.value],
-                [self.lb_led_state, self.rb_led_state]
-            )
-            self.get_logger().info("HAZARD WARNING LIGHT")
-            return
+    def publish_steering_velocity(self, steering, velocity):
+        msg = I2CWrite()
+        msg.command = "servo"
+        msg.cmd = 1
+        msg.subcmd = 3
+        if self.reverse_steering:
+            steering *= -1
+        if self.reverse_velocity:
+            velocity *= -1
+        msg.data = [velocity, steering, 0.0, 0.0, 0.0]
+        self.publisher.publish(msg) 
 
-        # LED1 (LB) blinken
-        if self.lb_blinking:
-            self.lb_led_state = not self.lb_led_state
-            self.rover_driver.digitalWrite(
-                [ESP32_PORTS.LED1.value, 0],
-                [self.lb_led_state, 0]
-            )
-            self.get_logger().info("LEFT TURN LIGHT")
-            return
-        
-        # LED2 (RB) blinken
-        if self.rb_blinking:
-            self.rb_led_state = not self.rb_led_state
-            self.rover_driver.digitalWrite(
-                [0, ESP32_PORTS.LED2.value],
-                [0, self.rb_led_state]
-            )
-            self.get_logger().info("RIGHT TURN LIGHT")
-            return
 
-    def cmd_driver_callback(self, msg:Joy):
+    def cmd_driver_callback(self, msg: Joy):
         axes = msg.axes.tolist()
-        axes = [round(x,3) for x in axes]
+        axes = [round(x, 3) for x in msg.axes]
         buttons = msg.buttons.tolist()
 
-
-
+        #
+        # für einfacheren Zugriff, buttons in Variablen ablegen
         x_button = buttons[BUTTONS.X.value]
         b_button = buttons[BUTTONS.B.value]
-
-
         lb_button = buttons[BUTTONS.LB.value]
         rb_button = buttons[BUTTONS.RB.value]
 
-        # Blinken toggeln bei Button-Press (Rising-Edge-Detection)
         if self.last_buttons is not None:
-            if lb_button and not self.last_buttons[BUTTONS.LB.value]:
-                self.lb_blinking = not self.lb_blinking
-                self.get_logger().info(f'LB-Button: Blinken {"AN" if self.lb_blinking else "AUS"}')
 
-                # sicherstellen das die LED auch aus ist
-                if not self.lb_blinking:
-                    self.rover_driver.set_led(ESP32_PORTS.LED1.value, False)
-                    self.lb_led_state = False
-
-            if rb_button and not self.last_buttons[BUTTONS.RB.value]:
-                self.rb_blinking = not self.rb_blinking
-                self.get_logger().info(f'RB-Button: Blinken {"AN" if self.rb_blinking else "AUS"}')
-                # sicherstellen das die LED auch aus ist
-                if not self.rb_blinking:
-                    self.rover_driver.set_led(ESP32_PORTS.LED2.value, False)
-                    self.rb_led_state = False
-        
-        if  x_button and  b_button:
             #
-            # X+B am Controller toggelt von MANUAL-Mode in AUTO-MODE und wieder zurück
-            #self.get_logger().info(f'MODE1 {self.MANUAL_MODE} vs {self.last_mode}')
+            # Links blinken
+            if lb_button and not self.last_buttons[BUTTONS.LB.value]:
+                self.publish_led_pattern(
+                    pattern_id=LEDPattern.BLINK_LEFT, 
+                    duration_on=500, 
+                    duration_off=500,
+                    ledmask = 0b00011100001110
+                )
+
+            #
+            # Rechts blinken
+            if rb_button and not self.last_buttons[BUTTONS.RB.value]:
+                self.publish_led_pattern(
+                    pattern_id=LEDPattern.BLINK_RIGHT, 
+                    duration_on=500, 
+                    duration_off=500,
+                    ledmask = 0b01110000111000
+                )            #
+            # Warnblink
+            if rb_button and lb_button:
+                self.publish_led_pattern(
+                    pattern_id=LEDPattern.HAZARD_LIGHT,
+                    duration_on=500, 
+                    duration_off=500,
+                    ledmask = 0xFFFFFFF
+                )
+
+        if x_button and b_button:
             if not self.toggle_active:
-                # Nur einmal toggeln
                 self.MODE = "MANUAL" if self.MODE == "AUTO" else "AUTO"
-                self.logger.info(f'*** Modus gewechselt auf: {self.MODE}')
-                self.toggle_active = True  # merken: wurde bereits getoggelt
+                self.get_logger().info(f'Modus gewechselt auf: {self.MODE}')
+                self.toggle_active = True
         else:
-            # Reset: Mind. eine Taste losgelassen
             self.toggle_active = False
 
         if axes != self.last_axes or buttons != self.last_buttons:
-            self.get_logger().debug(f'[Joystick] axes: {axes}, buttons: {buttons}')
-            
-            # Richtig: Werte speichern
             self.last_axes = list(axes)
-            self.last_buttons = list(buttons)        #
-            # Übergabe der Daten an den Hardware-Driver
+            self.last_buttons = list(buttons)
+
         if self.MODE == "MANUAL":
             velocity = axes[self.js_velocity]
             steering = axes[self.js_steering]
-
             now = time.monotonic()
             if (now - self.last_i2c_time >= self.min_interval and
-                (velocity != self.last_velocity or steering != self.last_steering)):
-
-                self.get_logger().debug(f'[cmd_driver_callback] velo: {velocity}, steering: {steering}')
-                rc = self.rover_driver.set_steeringAndVelocity(
-                    steering=steering, 
-                    velocity=velocity, 
-                    reverse_steering=self.reverse_steering, 
-                    reverse_velocity=self.reverse_velocity
-                )
-
+                    (velocity != self.last_velocity or steering != self.last_steering)):
+                self.publish_steering_velocity(steering, velocity)
                 self.last_i2c_time = now
                 self.last_velocity = velocity
                 self.last_steering = steering
-                return rc
-            else:
-                self.get_logger().debug("I2C übersprungen: keine Änderung oder Rate-Limit aktiv")
         else:
-            #
-            # noch nicht implementiert
-            #
             self.get_logger().warn("AUTO-MODE noch nicht implementiert")
-            pass
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = DriverControllerNode()
     rclpy.spin(node)
     node.destroy_node()
-    rclpy.shutdown()
+    rclpy.shutdown()     

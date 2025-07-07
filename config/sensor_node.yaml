@@ -1,0 +1,19 @@
+# ------------------------------------------------------
+# Spezielle Parameter für den Sensor_Node
+# ------------------------------------------------------
+sensor_node:
+  ros__parameters:
+    #
+    # Battery-Sensor liegt am I2C-Bus 1
+    battery_voltage_channel: 0
+    battery_current_channel: 1
+    battery_sensor_active: true
+    battery_sensor_gain: 0
+    battery_sensor_factor: 6.144
+    battery_critical: 13.1
+    battery_low: 13.4
+    battery_full: 16.2
+    
+    #
+    # IMU-Sensor liegt am I2C-Bus 1
+    imu_sensor_active: false

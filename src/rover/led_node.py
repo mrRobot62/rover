@@ -140,17 +140,17 @@ class LEDNode(Node):
         self.led_default_ledmask = self.get_parameter('led_default_ledmask').get_parameter_value().integer_value
 
         self.get_logger().info(
-f"""
-LEDNode config:\n\
---------------------------------
-Topic:          {self.led_topic},
-LEDType:        {self.led_type},
-Pixels:         {self.led_num_pixel},
-Brightness:     {self.led_default_brightness},
-Timeout:        {self.led_default_timeout},
-DurationON:     {self.led_default_duration_on},
-DurationOFF:    {self.led_default_duration_off},
-""")
+        f"""
+        LEDNode config:\n\
+        --------------------------------
+        Topic:          {self.led_topic},
+        LEDType:        {self.led_type},
+        Pixels:         {self.led_num_pixel},
+        Brightness:     {self.led_default_brightness},
+        Timeout:        {self.led_default_timeout},
+        DurationON:     {self.led_default_duration_on},
+        DurationOFF:    {self.led_default_duration_off},
+        """)
         self.pattern = {
             LEDPattern.OFF: LEDPatternConfig(LEDPattern.OFF, 
                 "OFF", 

@@ -20,18 +20,6 @@ odom_node:
     speed: 0.5
     angle: 30
 
-sensor_node:
-  ros__parameters:
-    battery_sensor_active: false
-    battery_topic: "/battery"
-    battery_sensor_gain: 1.0
-    battery_critical: 13.1
-    battery_low: 13.4
-    battery_full: 16.2
-    
-    mpu6500_sensor_active: false
-    mpu6500_imu_topic: "/imu"
-
 led_node:
   ros__parameters:
     led_topic: "/led"
@@ -48,9 +36,17 @@ vision_node:
 
 i2c_node:
   ros__parameters:
-    i2c_read_topic : "/i2c/read"
-    i2c_write_topic : "/i2c/write"
-    
+    # subscribe einen Befehl der an einen Slave gesendet wird (Write)
+    i2c_write_topic: "/i2c/write"
+    # publish einen Value der von einen I2C Slave empfangen wurde
+    i2c_read_topic: "/i2c/read"
+    timer_update: 0.5
+    i2c_bus_id: 1
+    i2c_esp32_addr: 0x12
+    i2c_esp32_raise_onerror: True
+    i2c_ads_addr: 0x48
+    i2c_ads_raise_onerror: False
+
 # ------------------------------------------------------
 # der verwendete Lidar soll generisch eingebunden werden
 # Default lidar_model:=ydlidar
@@ -84,7 +80,7 @@ driver_controller_node:
   ros__parameters:
     cmd_vel_topic: "/joy"
     log_level: INFO
-    reverse_steering: true
+    reverse_steering: false
     reverse_velocity: false
     # Joystick mappings
     # LJ_LR = 0, LJ_UD = 1

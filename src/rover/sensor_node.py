@@ -15,7 +15,10 @@ from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import State
 from .sensors.lidar_sensor import LidarSensor
 from .sensors.battery_sensor import BatterySensor
-from rover_interfaces.msg import Battery
+
+
+
+from rover_interfaces.msg import Battery, LEDMessage
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.executors import MultiThreadedExecutor
@@ -24,8 +27,8 @@ import random
 
 class SensorNode(LifecycleNode):
     def __init__(self):
-        super().__init__('sensor_node')
-
+        self.node_name = self.__class__.__name__
+        super().__init__(self.node_name)
         self.lidar = None
         self.batterySensor = None
         self.timer = None
@@ -33,7 +36,9 @@ class SensorNode(LifecycleNode):
         self.battery_publisher = None
         self.imu_publisher = None
         self.callback_group = ReentrantCallbackGroup()
-        self.get_logger().info('SensorNode constructed')
+
+
+        self.get_logger().info(f"[{self.node_name}] Node im Status unconfigured")
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         try:
@@ -46,68 +51,143 @@ class SensorNode(LifecycleNode):
             self.lidar = LidarSensor(lidar_topic)
 
             # BatterySensor initialisieren
-            self.declare_parameter('battery_sensor_active', False)
-            self.declare_parameter('battery_topic', '/battery')
-            self.declare_parameter('battery_critical', 13.1)
-            self.declare_parameter('battery_low', 13.4)
-            self.declare_parameter('battery_full', 16.2)
+            self.declare_parameters(
+                namespace='',
+                parameters = [
+                    # Common Parameter
+                    ('topic_led','/led'),
+                    ('topic_battery','/battery'),
+                    ('topic_imu','/imu'),
+                    ('i2c_bus1',1),
+                    ('i2c_esp_adr',0x12),
+                    ('i2c_ads_adr', 0x48),
+
+                    # Node Parameter
+                    ('battery_sensor_active', True),
+                    ('battery_critical', 1.0),
+                    ('battery_sensor_gain', 0),
+                    ('battery_sensor_factor', 6.144),
+                    ('battery_low', 1.0),
+                    ('battery_full', 1.0),
+                    ('battery_voltage_channel', 0),
+                    ('battery_current_channel', 1),
+                    ('battery_i2c_bus_id', 1),
+                    ('imu_sensor_active', False),
+                ])
+
+            # Common Parameter
+            self.i2c_bus1 = self.get_parameter('i2c_bus1').get_parameter_value().integer_value
+            self.i2c_esp_adr = self.get_parameter('i2c_ads_adr').get_parameter_value().integer_value
+            self.i2c_ads_adr = self.get_parameter('i2c_ads_adr').get_parameter_value().integer_value
+            self.topic_battery = self.get_parameter('topic_battery').get_parameter_value().string_value
+            self.topic_led = self.get_parameter('topic_led').get_parameter_value().string_value
+            self.topic_imu = self.get_parameter('topic_imu').get_parameter_value().string_value
+
+            # Node Parameter
             self.battery_sensor_active = self.get_parameter('battery_sensor_active').get_parameter_value().bool_value
-            self.battery_topic = self.get_parameter('battery_topic').get_parameter_value().string_value
+            self.battery_sensor_gain = self.get_parameter('battery_sensor_gain').get_parameter_value().integer_value
+            self.battery_sensor_factor = self.get_parameter('battery_sensor_factor').get_parameter_value().double_value
             self.battery_critical = self.get_parameter('battery_critical').get_parameter_value().double_value
             self.battery_low = self.get_parameter('battery_low').get_parameter_value().double_value
             self.battery_full = self.get_parameter('battery_full').get_parameter_value().double_value
+            self.battery_voltage_channel = self.get_parameter('battery_voltage_channel').get_parameter_value().integer_value
+            self.battery_current_channel = self.get_parameter('battery_current_channel').get_parameter_value().integer_value
+            self.imu_sensor_active = self.get_parameter('imu_sensor_active').get_parameter_value().bool_value
+            # Sensoren installieren
             try:
                 if self.battery_sensor_active:
-                    self.batterySensor = BatterySensor(self.get_logger(), chan=0, gain=1)
+                    self.batterySensor = BatterySensor(
+                        logger=self.get_logger(),
+                        i2c_bus_id=self.i2c_bus1,
+                        batMin=self.battery_low,
+                        batMax=self.battery_full,
+                        batVCh=self.battery_voltage_channel,
+                        batCCh=self.battery_current_channel,
+                        i2c_slave_address=self.i2c_ads_adr,
+                        gain=self.battery_sensor_gain
+                    )
+                    self.get_logger().warn(f"[self.node_name] => BatterySensor ready")
                 else:
                     self.get_logger().warn(f"BatterySensor deaktiviert")
                     self.batterySensor = None
-
             except Exception as err:
                 self.get_logger().error(f"BatterySensor konnte nicht initialisiert werden: {err}")
                 self.batterySensor = None
+                import traceback
+                self.get_logger().error(traceback.format_exc())
+                return TransitionCallbackReturn.FAILURE
 
+            try:
+                if self.imu_sensor_active:
+                    self.get_logger().warn(f"IMU aktuell nicht implementiert")
+                    #self.get_logger().warn(f"[self.node_name] => IMUSensor ready")
+
+                else:
+                    self.get_logger().warn(f"IMU deaktiviert")
+                    self.imuSensor = None
+            except Exception as err:
+                self.get_logger().error(f"IMUSensor konnte nicht initialisiert werden: {err}")
+                self.imuSensor = None
+                return TransitionCallbackReturn.FAILURE
+                  
             #
-            # MPU6500 (Accelerometer)
-            self.declare_parameter('mpu6500_imu_topic', '/imu')
-            self.mpu6500_imu_topic = self.get_parameter('mpu6500_imu_topic').get_parameter_value().string_value
+            # PUBLISHER aktivieren
 
-            # Publisher vorbereiten (aber noch nicht aktiviert)
-            # Bemerkung: es wird explizit hier keine publish der Lidardaten durchgeführt, da der Lidar selber ein Topic-Publisher ist.
-            #
-            self.battery_publisher = self.create_lifecycle_publisher(Battery, self.battery_topic, 10)
-            self.imu_publisher = self.create_lifecycle_publisher(Imu, self.mpu6500_imu_topic, 10)
-            
-            self.get_logger().info('[SensorNode] battery_publisher ready')
-            self.get_logger().info('[SensorNode] imu_publisher ready')
+            # Allgemeine Topics publishen
+            self.led_publisher = self.create_publisher(LEDMessage, self.topic_led, 10)
 
-            self.get_logger().info('[SensorNode] on_configure() abgeschlossen')
+            # Sensor spezifische Topics publishen
+            self.battery_publisher = self.create_lifecycle_publisher(Battery, self.topic_battery, 10)
+            self.imu_publisher = self.create_lifecycle_publisher(Imu, self.topic_imu, 10)
+
+            self.get_logger().info(
+            f"""
+            SensorNode config:\n\
+            Publish-Topics
+            --------------------------------------------
+            LED:                                {self.topic_led}
+            BATTERY:                            {self.topic_battery}
+            IMU:                                {self.topic_imu}
+            --------------------------------------------
+            BATTERY-SENSOR
+                battery_sensor_active:          {self.battery_sensor_active}
+                battery_critical:               {self.battery_critical}
+                battery_low:                    {self.battery_low}
+                battery_full:                   {self.battery_full}
+                battery_voltage_channel:        {self.battery_voltage_channel}
+                battery_current_channel:        {self.battery_current_channel}
+
+            IMU-Sensor
+                battery_sensor_active:          {self.imu_sensor_active}
+            """)
+
+            self.get_logger().info('on_configure() abgeschlossen')
             return TransitionCallbackReturn.SUCCESS
 
         except Exception as e:
-            self.get_logger().error(f'[SensorNode] Fehler in on_configure(): {e}')
+            self.get_logger().error(f'Fehler in on_configure(): {e}')
             import traceback
             self.get_logger().error(traceback.format_exc())
             return TransitionCallbackReturn.FAILURE
 
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info('[SensorNode] on_activate()')
+        self.get_logger().info('on_activate()')
 
         # Publisher aktivieren
         self.battery_publisher.on_activate(state)
-        self.get_logger().info(f"[SensorNode] publish battery state on '{self.battery_topic}'")
+        self.get_logger().info(f"battery_publisher aktiviert")
         self.imu_publisher.on_activate(state)
-        self.get_logger().info(f"[SensorNode] publish MPU6500 state on '{self.mpu6500_imu_topic}'")
+        self.get_logger().info(f"imu_publisher aktiviert")
 
         # Timer starten
-        self.timer = self.create_timer(10.0, self.read_and_publish_voltage)
-        self.timer2 = self.create_timer(2.0, self.read_and_publish_imu)
+        self.timer = self.create_timer(10.0, self.publish_battery_state)
+        self.timer2 = self.create_timer(2.0, self.publish_imu_state)
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info('[SensorNode] on_deactivate()')
+        self.get_logger().info('on_deactivate()')
 
         if self.timer is not None:
             self.timer.cancel()
@@ -157,30 +237,25 @@ class SensorNode(LifecycleNode):
         self.get_logger().error('[SensorNode] Fehlerzustand!')
         return TransitionCallbackReturn.SUCCESS
 
-    def read_and_publish_voltage(self):
+    def publish_battery_state(self):
         try:
             if self.batterySensor is not None:
-                voltage = self.batterySensor.read_voltage()
-                self.get_logger().info(f'Aktuelle Batteriespannung: {voltage:.2f} V')
-
+                voltage = self.batterySensor.voltage()
+                current = self.batterySensor.current()
+                raw_v = self.batterySensor.ads.read_channel(0)
+                level = self.batterySensor.battery_level()
                 msg = Battery()
-                msg.battery_current = 0.0   # aktuell nicht genutzt
-                msg.battery_voltage = voltage
-                msg.battery_level = self.__estimate_level(
-                    msg.battery_voltage,
-                    battery_min=self.battery_low,
-                    battery_max=self.battery_full
-                )
+                msg.battery_current = (current if current > 0.0 else 0.0)
+                msg.battery_voltage = (voltage if voltage > 0.0 else 0.0)
+                msg.battery_level = level
+
+                self.get_logger().info(f'Battery State => ({msg.battery_level}%) | {msg.battery_voltage:.2f}V ({raw_v}) | {msg.battery_current:.2f}A')
             else:
-                self.get_logger().warn('BatterySensor nicht verfügbar')
+                self.get_logger().warn('BatterySensor nicht verfügbar ')
                 msg = Battery()
                 msg.battery_current = 0.0 # aktuell nicht genutzt
-                msg.battery_voltage = float(random.randrange(1320, 1620)) / 100.0
-                msg.battery_level = self.__estimate_level(
-                    voltage=msg.battery_voltage,
-                    battery_min=self.battery_low,
-                    battery_max=self.battery_full
-                )
+                msg.battery_voltage = 0.0
+                msg.battery_level = 100
 
         except Exception as e:
             self.get_logger().error(f'Fehler beim Lesen des Batteriesensors: {e}')
@@ -192,25 +267,12 @@ class SensorNode(LifecycleNode):
             self.get_logger().warn(f'Konnte Batteriestatus nicht veröffentlichen: {e}')
 
 
-    def read_and_publish_imu(self):
+    def publish_imu_state(self):
         self.get_logger().debug('[SensorNode] read_and_publish_imu() – noch nicht implementiert')
         # try:
         #     self.imu_publisher.publish(msg)
         # except Exception as e:
         #     self.get_logger().warn(f'Konnte IMU-Daten nicht veröffentlichen: {e}')
-
-    def __estimate_level(self, voltage: float, battery_min: float, battery_max:float) -> int:
-        MIN_VOLTAGE = battery_min if battery_min > 0.0 else 13.1
-        MAX_VOLTAGE = battery_max if battery_max > 0.0 else 16.2
-
-        # Begrenzen auf den Spannungsbereich
-        clamped = max(min(voltage, MAX_VOLTAGE), MIN_VOLTAGE)
-
-        # Prozentsatz berechnen
-        level = ((clamped - MIN_VOLTAGE) / (MAX_VOLTAGE - MIN_VOLTAGE)) * 100.0
-
-        return int(round(level))
-
 
 def main(args=None):
     rclpy.init(args=args)

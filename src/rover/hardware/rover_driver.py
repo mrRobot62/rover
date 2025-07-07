@@ -12,13 +12,14 @@ class RoverDriver():
         Steuert den Rover über I2C in Geschwindigkeit (velocity) und Lenkung (Steering)
         
     """
-    def __init__(self, logger):
+    def __init__(self, logger, bus):
         """
         Konstruktor, übergeben wird ein ROS2-Logger
         """
         self.logger = logger
         self.servo_driver = ServoDriver(self.logger)
         self.esp32_driver = ESP32RawDriver(self.logger)
+        self.bus = bus
 
     def set_led(self, pin, position=0, state=0):
         """
@@ -38,6 +39,12 @@ class RoverDriver():
 
         self.digitalWrite(pin_list,state_list)
 
+    def pingESP(self):
+        """
+        Ping an den ESP32 ob er erreichbar ist, wenn ja return 0
+        wenn nein return 1
+        """
+        return 0
 
     def digitalWrite(self, pins: List[int]=[0,0], states:List[int]=[0,0]):
         """ 

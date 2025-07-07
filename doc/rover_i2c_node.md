@@ -11,10 +11,12 @@ Dieser Node übernimmt alle physischen I2C-Kommunikationsvorgänge, während and
 ## 🏗️ Architekturübersicht
 
 ```
-[DriverControllerNode] → /i2c/write → [i2c_node] → I2C-Bus → [ESP32 / ADS1115]
-                                         ↑
-[LoggerNode / ADSReader] ← /i2c/result ←─┘
-[SensorClient] ⇄ /i2c/read (Service) ⇄ [i2c_node]
+[driver_controller_node] ─────┐
+                              │
+[sensor_node] ───────────────-┼──▶ [i2c_node] ──> /dev/i2c-1
+                              │        │
+[other_node] ────────────────-┘        ├── ADS1115
+                                       └── ESP32
 ```
 
 Der zentrale `i2c_node` arbeitet als **LifecycleNode**, um strukturierte Zustandsübergänge und kontrollierten Systemstart zu ermöglichen.
@@ -35,6 +37,7 @@ Der zentrale `i2c_node` arbeitet als **LifecycleNode**, um strukturierte Zustand
 ### ✏️ `I2CWrite.msg`
 
 Verwendet, um Schreibbefehle an den `i2c_node` zu senden.
+Dies sind Steuerbefehle für den ESP32 und wird vom `driver_controller_node` genutzt
 
 ```
 string command       # z. B. "digital_write", "servo"
@@ -47,7 +50,8 @@ float64[] data       # z. B. Geschwindigkeit, Lenkung
 
 **Beispiel:**
 ```
-command: "servo"
+command: CommandID.SERVO_WRITE
+subcmd: SubCommandID.SCMD_SERVO_SPEED
 data: [1.0, 0.5, 0, 0, 0]
 ```
 
@@ -55,12 +59,19 @@ data: [1.0, 0.5, 0, 0, 0]
 
 ### 💡 `I2CReadResult.msg`
 
-Wird vom `i2c_node` als Publisher gesendet, um Ergebnisse von I2C-Lesevorgängen zu verbreiten.
+Wird vom `i2c_node` als Publisher versendet, um Ergebnisse von I2C-Lesevorgängen zu verbreiten.
+Aktuelle Verwendung des ADS1115 Sensors. Zukünftig auch weitere I2C-Sensorn, für die kein build-in Message besteht.
 
+**ANTWORT-Struktur**
 ```
-string source         # Sensorname z. B. "ads1115"
-int32 address         # I2C-Adresse (z. B. 0x48 = 72)
-float64[] values      # Gelesene Werte
+# Request für den ESP32 verwendet wird
+string device
+int32 command           # Command für den Slave
+int32 subcommand        # ggf. SubCommand für den Slave (z.B. esp32)
+---
+# Response
+float32 fvalues         # gefüllt je nach command/subcommand
+int32[] ivalues         # gefüllt je nach command/subcommand
 ```
 
 **Typischer Use-Case:**
@@ -69,23 +80,45 @@ float64[] values      # Gelesene Werte
 
 ---
 
-### 📢 `I2CReadRequest.srv`
+### 📢 `I2Cesp32ReadRequest.srv`
 
-ROS 2 Service zur gezielten Abfrage von I2C-Daten.
+ROS 2 Service zur gezielten Abfrage an den ESP32 stellt und das Ergebnis (Response) versendet
+Typisches Szenario: Abfrage von Servo-Daten über den ESP32
+
 
 **Request:**
 ```
-string device         # z. B. "ads1115" oder "esp32"
+string device           # "esp32"
+int32 command           # Command für den Slave
+int32 subcommand        # ggf. SubCommand für den ```
+
+**Response:**
+```
+float32 fvalues         # gefüllt je nach command/subcommand
+int32[] ivalues         # gefüllt je nach command/subcommand```
+
+**Typischer Use-Case:**
+- gezielte Abfrage von Servo-Zuständen
+
+### 📢 `I2CReadRequest.srv`
+
+ROS 2 Service zur gezielten generische Abfrage eines beliebigen I2C-Slaves
+Rückgabe struktur gilt für alle Slaves gleichermaßen
+
+**Request:**
+```
+string device           # "ads1115"
 ```
 
 **Response:**
 ```
-float64[] values      # Antwortwerte vom I2C-Device
+float32 fvalues         # grundsätzliche Rückgabe sind Float-Werte
 ```
 
 **Typischer Use-Case:**
-- Einmalige Abfrage z. B. Digital-Input
-- Gezielter Test einzelner Sensoren
+- gezielte Abfrage von Servo-Zuständen
+
+
 
 ---
 
@@ -93,7 +126,7 @@ float64[] values      # Antwortwerte vom I2C-Device
 
 1. **Erstellen des zentralen `i2c_node`** als LifecycleNode
 2. **Definieren der Schnittstellen:**
-   - `I2CWrite.msg`, `I2CReadResult.msg`, `I2CReadRequest.srv`
+   - `I2CWrite.msg`, `I2CReadResult.msg`, `I2Cesp32ReadRequest.srv`,`I2CReadRequest.srv`
 3. **Kommunikationsstruktur:**
    - Andere Nodes senden über `/i2c/write`
    - `i2c_node` sendet Ergebnisse über `/i2c/result`

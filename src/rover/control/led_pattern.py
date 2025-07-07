@@ -17,6 +17,7 @@ class LEDPattern(Enum):
     HAZARD_LIGHT = 12
     
     # fill()
+    # Battery-Level
     BATTERY_100 = 100
     BATTERY_90 = 101
     BATTERY_80 = 102
@@ -30,6 +31,7 @@ class LEDPattern(Enum):
     # blink()
     BATTERY_10 = 108
     BATTERY_LOW = 109
+    BATTERY_CRITICAL = 110
 
     # Rover - driver_controller_node
     # blink()

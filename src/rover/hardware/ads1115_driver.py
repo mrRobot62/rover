@@ -35,17 +35,17 @@ class ADS1115Driver:
         self.CONFIG_GAIN = (self.ADS_GAINS[gain][0] if gain in self.ADS_GAINS else self.ADS_GAINS[0][0])
         self.CONFIG_GAIN_FACTOR = (self.ADS_GAINS[gain][1] if gain in self.ADS_GAINS else self.ADS_GAINS[0][1])
 
-    def read_voltage(self, channel : int) -> float:
+    def read_voltage(self, channel : int = 0) -> float:
         """ Rückgabe des konvertierten Volt-Wertes zw. 0-5V basieren auf IN: 0-25.0V"""
         raw = self.read_channel(channel)
-        return round((raw * self.CONFIG_GAIN_FACTOR) / 32768.0, 2)
+        return (raw * self.CONFIG_GAIN_FACTOR) / 32768.0
 
     def scaled_voltage(self, channel: int, voltMaxIn=25.0, voltMaxOut=5.0):
         """
         konvertiert den ADC-Wert aus read_voltage in einen Bereich zwischen MaxIn und MaxOut
         """
         sensor_voltage = self.read_voltage(channel=channel)
-        return round((sensor_voltage / voltMaxOut) * voltMaxIn,2)
+        return (sensor_voltage / voltMaxOut) * voltMaxIn
 
     def read_channel(self, channel: int) -> int:
         if not 0 <= channel <= 3:

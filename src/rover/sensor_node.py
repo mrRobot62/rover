@@ -14,10 +14,8 @@ from sensor_msgs.msg import Imu
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import State
 from .sensors.lidar_sensor import LidarSensor
-from .sensors.battery_sensor import BatterySensor
-
-
-
+from .sensors.battery_sensor import BatterySensor, BatteryStatus, PowerStatus
+from .control.led_pattern import LEDPattern
 from rover_interfaces.msg import Battery, LEDMessage
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.lifecycle import TransitionCallbackReturn
@@ -26,6 +24,21 @@ from rclpy.executors import MultiThreadedExecutor
 import random
 
 class SensorNode(LifecycleNode):
+
+    battery_levels = [
+        (100, LEDPattern.BATTERY_100),
+        (90, LEDPattern.BATTERY_90),
+        (80, LEDPattern.BATTERY_80),
+        (70, LEDPattern.BATTERY_70),
+        (60, LEDPattern.BATTERY_60),
+        (50, LEDPattern.BATTERY_50),
+        (40, LEDPattern.BATTERY_40),
+        (30, LEDPattern.BATTERY_30),
+        (20, LEDPattern.BATTERY_20),
+        (10, LEDPattern.BATTERY_LOW),
+        (0,  LEDPattern.BATTERY_CRITICAL),
+    ]
+
     def __init__(self):
         self.node_name = self.__class__.__name__
         super().__init__(self.node_name)
@@ -73,7 +86,7 @@ class SensorNode(LifecycleNode):
                     ('voltage_max_in', 25.0),
                     ('voltage_max_out', 5.0),
                     ('ads1115_gain', 0),
-                    ('acs712_type', "5A"),
+                    ('acs712_type', 5),
                     ('acs712_vdd', 5.0),
                     ('imu_sensor_active', False),
                 ])
@@ -97,7 +110,7 @@ class SensorNode(LifecycleNode):
             self.battery_current_channel = self.get_parameter('battery_current_channel').get_parameter_value().integer_value
             self.ads1115_gain = self.get_parameter('ads1115_gain').get_parameter_value().integer_value
 
-            self.acs712_type = self.get_parameter('acs712_type').get_parameter_value().string_value
+            self.acs712_type = self.get_parameter('acs712_type').get_parameter_value().integer_value
             self.acs712_vdd = self.get_parameter('acs712_vdd').get_parameter_value().double_value
 
             self.imu_sensor_active = self.get_parameter('imu_sensor_active').get_parameter_value().bool_value
@@ -249,25 +262,50 @@ class SensorNode(LifecycleNode):
         self.get_logger().error('[SensorNode] Fehlerzustand!')
         return TransitionCallbackReturn.SUCCESS
 
+
+    def __get_battery_pattern(self, percentage: int) -> int:
+
+        for threshold, level in self.battery_levels:
+            if percentage >= threshold:
+                return level.value
+        return LEDPattern.BATTERY_10.value
+
     def publish_battery_state(self):
         try:
             if self.batterySensor is not None:
-                voltage = self.batterySensor.scaled_voltage()
-                current = self.batterySensor.current()
-                raw_v = self.batterySensor.ads.read_voltage()
-                level = self.batterySensor.battery_level()
-                msg = Battery()
-                msg.battery_current = (current if current > 0.0 else 0.0)
-                msg.battery_voltage = (voltage if voltage > 0.0 else 0.0)
-                msg.battery_level = level
+                voltage = round(self.batterySensor.scaled_voltage(),2)
+                current = round(self.batterySensor.read_current(),2)
+                raw_v = round(self.batterySensor.read_voltage(),2)
+                level = self.batterySensor.battery_level(voltage)       # die aktuelle Messung wird genutzt
+                self.get_logger().info(f'(1) Battery State => ({level}%) | {voltage:.2f}V | {current:.2f}A')
+                # batStatus = self.batterySensor.get_battery_status(
+                #     self.battery_voltage_channel
+                # )
+                # pwrStatus = self.batterySensor.get_power_consumption(
+                #     current_channel=self.battery_current_channel,
+                #     high_power=self.acs712_type                    
+                # )
 
-                self.get_logger().info(f'Battery State => ({msg.battery_level}%) | {msg.battery_voltage:.2f}V ({raw_v}) | {msg.battery_current:.2f}A')
+                batStatus = BatteryStatus(voltage=voltage, level=level)
+                pwrStatus = PowerStatus(current)
+
+                msg = Battery()
+                msg.battery_voltage = batStatus.voltage
+                msg.battery_level = batStatus.level
+                msg.battery_current = pwrStatus.current
+
+                self.get_logger().info(f'Battery State => ({msg.battery_level}%) | {msg.battery_voltage:.2f}V | {msg.battery_current:.2f}A')
             else:
                 self.get_logger().warn('BatterySensor nicht verfügbar ')
                 msg = Battery()
                 msg.battery_current = 0.0 # aktuell nicht genutzt
                 msg.battery_voltage = 0.0
                 msg.battery_level = 100
+
+            ledMsg = LEDMessage()
+            pattern = self.__get_battery_pattern(level)
+            self.get_logger().info(f'LED-Pattern: {pattern}')
+
 
         except Exception as e:
             self.get_logger().error(f'Fehler beim Lesen des Batteriesensors: {e}')

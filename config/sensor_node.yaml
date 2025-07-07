@@ -8,10 +8,15 @@ sensor_node:
     battery_voltage_channel: 0
     battery_current_channel: 1
     battery_sensor_active: true
-    battery_critical: 12.4        # hier schaltet der rover ab, 4S, 4x 3.25V/Zelle
-    battery_low: 13.6             # unterste Spannung, Rover fährt noch 4x 3.4V/Zelle
-    battery_full: 16.8            # 4S-Lipo 4x4.2V = 16.8V am Eingang des Voltage-Sensors
-    
+#    battery_critical: 12.4        # hier schaltet der rover ab, 4S, 4x 3.25V/Zelle
+#    battery_low: 13.6             # unterste Spannung, Rover fährt noch 4x 3.4V/Zelle
+#    battery_full: 16.8            # 4S-Lipo 4x4.2V = 16.8V am Eingang des Voltage-Sensors
+
+    # NUR FÜR TEST BEI 12 EINGANGS_SPANNUNG
+    battery_critical: 11.0        # nur für Grenzen zu testen
+    battery_low: 11.5             # nur für Grenzen zu testen
+    battery_full: 12.2           # nur für Grenzen zu testen
+
     #
     # Es wird ein einfacher VoltageSensor verwendet
     voltage_max_in: 25.0  # Maximaler Spannungseingang 25.0
@@ -24,7 +29,7 @@ sensor_node:
     #
     # ACS712 Current-Sensor
     # 5A Version
-    acs712_type: "5A"          # 5A, 20A, 30A, aus dieser Angabe wird der Skalierungs-Faktor abgeleitet
+    acs712_type: 5          # 5A, 20A, 30A, aus dieser Angabe wird der Skalierungs-Faktor abgeleitet
     acs712_vdd: 5.0             # 5V oder 3.3
     
     # IMU-Sensor liegt am I2C-Bus 1

@@ -1,33 +1,51 @@
 from .i2c_driver import SingletonI2CBus
 import time
+from enum import Enum
+
+"""
+Angepasste ADS1115Driver Klasse, da unter PI5 die adafruit Klasse nicht verwendet werden kann.
+Verwendet wird smbus2, das kann die adafruit-klasse nicht.
+
+Diese Klasse stellt drei Methoden zur Verfügung
+scaled_voltage: skalierter Wertbereich in einer Range von 0-25V.
+read_voltage: der tatsächliche berechnte Raw-Wert (in Volt) der am ADC anliegt
+read_channel: liefert inen integer Wert zwische -32767 - +32768 zurück
+
+"""
 
 class ADS1115Driver:
     POINTER_CONVERT = 0x00
     POINTER_CONFIG = 0x01
     # Gain = +/- 4.096V (bitmask: 0b0100000000000000)
     # gain = +/- 6.144V
-    CONFIG_GAIN = 0x0000    # +- 6.144V
+    #CONFIG_GAIN = 0x0000    # +- 6.144V
     CONFIG_DEFAULT = 0x8583  # Single-shot, AIN0, 128SPS, disable comparator
-    CONFIG_GAIN_FACTOR = 6.144
+    #CONFIG_GAIN_FACTOR = 6.144
+
+    ADS_GAINS = {
+        0 : [0x0000, 6.144],  # 6.144V Messbereich
+        1 : [0x0200, 4.096],  # 4.096V Messbereich
+    }
 
     def __init__(self, logger, bus_id=1, slave_address=0x48, gain:int=0):
         self.logger = logger
         self.bus = SingletonI2CBus().getBus(bus_id)
         self.addr = slave_address
         self.logger.info("ADS1115Driver init")
+        self.CONFIG_GAIN = (self.ADS_GAINS[gain][0] if gain in self.ADS_GAINS else self.ADS_GAINS[0][0])
+        self.CONFIG_GAIN_FACTOR = (self.ADS_GAINS[gain][1] if gain in self.ADS_GAINS else self.ADS_GAINS[0][1])
 
-
-    def voltage(self, channel : int) -> float:
-        """ Rückgabe des konvertierten Volt-Wertes"""
+    def read_voltage(self, channel : int) -> float:
+        """ Rückgabe des konvertierten Volt-Wertes zw. 0-5V basieren auf IN: 0-25.0V"""
         raw = self.read_channel(channel)
-        return raw * self.CONFIG_GAIN_FACTOR / 32768.0
+        return round((raw * self.CONFIG_GAIN_FACTOR) / 32768.0, 2)
 
-    def current    (self, channel : int) -> float:
-        """ Rückgabe des konvertierten Strom-Wertes"""
-        raw = self.read_channel(channel)
-        return raw * self.CONFIG_GAIN_FACTOR / 32768.0
-
-
+    def scaled_voltage(self, channel: int, voltMaxIn=25.0, voltMaxOut=5.0):
+        """
+        konvertiert den ADC-Wert aus read_voltage in einen Bereich zwischen MaxIn und MaxOut
+        """
+        sensor_voltage = self.read_voltage(channel=channel)
+        return round((sensor_voltage / voltMaxOut) * voltMaxIn,2)
 
     def read_channel(self, channel: int) -> int:
         if not 0 <= channel <= 3:

@@ -65,13 +65,16 @@ class SensorNode(LifecycleNode):
                     # Node Parameter
                     ('battery_sensor_active', True),
                     ('battery_critical', 1.0),
-                    ('battery_sensor_gain', 0),
-                    ('battery_sensor_factor', 6.144),
                     ('battery_low', 1.0),
                     ('battery_full', 1.0),
                     ('battery_voltage_channel', 0),
                     ('battery_current_channel', 1),
                     ('battery_i2c_bus_id', 1),
+                    ('voltage_max_in', 25.0),
+                    ('voltage_max_out', 5.0),
+                    ('ads1115_gain', 0),
+                    ('acs712_type', "5A"),
+                    ('acs712_vdd', 5.0),
                     ('imu_sensor_active', False),
                 ])
 
@@ -85,13 +88,18 @@ class SensorNode(LifecycleNode):
 
             # Node Parameter
             self.battery_sensor_active = self.get_parameter('battery_sensor_active').get_parameter_value().bool_value
-            self.battery_sensor_gain = self.get_parameter('battery_sensor_gain').get_parameter_value().integer_value
-            self.battery_sensor_factor = self.get_parameter('battery_sensor_factor').get_parameter_value().double_value
             self.battery_critical = self.get_parameter('battery_critical').get_parameter_value().double_value
             self.battery_low = self.get_parameter('battery_low').get_parameter_value().double_value
             self.battery_full = self.get_parameter('battery_full').get_parameter_value().double_value
+            self.voltage_max_in = self.get_parameter('voltage_max_in').get_parameter_value().double_value
+            self.voltage_max_out = self.get_parameter('voltage_max_out').get_parameter_value().double_value
             self.battery_voltage_channel = self.get_parameter('battery_voltage_channel').get_parameter_value().integer_value
             self.battery_current_channel = self.get_parameter('battery_current_channel').get_parameter_value().integer_value
+            self.ads1115_gain = self.get_parameter('ads1115_gain').get_parameter_value().integer_value
+
+            self.acs712_type = self.get_parameter('acs712_type').get_parameter_value().string_value
+            self.acs712_vdd = self.get_parameter('acs712_vdd').get_parameter_value().double_value
+
             self.imu_sensor_active = self.get_parameter('imu_sensor_active').get_parameter_value().bool_value
             # Sensoren installieren
             try:
@@ -101,10 +109,14 @@ class SensorNode(LifecycleNode):
                         i2c_bus_id=self.i2c_bus1,
                         batMin=self.battery_low,
                         batMax=self.battery_full,
+                        voltMaxIn=self.voltage_max_in,
+                        voltMaxOut=self.voltage_max_out,
                         batVCh=self.battery_voltage_channel,
                         batCCh=self.battery_current_channel,
+                        acs712_type=self.acs712_type,
+                        acs712_vdd=self.acs712_vdd,
                         i2c_slave_address=self.i2c_ads_adr,
-                        gain=self.battery_sensor_gain
+                        gain=self.ads1115_gain
                     )
                     self.get_logger().warn(f"[self.node_name] => BatterySensor ready")
                 else:
@@ -240,9 +252,9 @@ class SensorNode(LifecycleNode):
     def publish_battery_state(self):
         try:
             if self.batterySensor is not None:
-                voltage = self.batterySensor.voltage()
+                voltage = self.batterySensor.scaled_voltage()
                 current = self.batterySensor.current()
-                raw_v = self.batterySensor.ads.read_channel(0)
+                raw_v = self.batterySensor.ads.read_voltage()
                 level = self.batterySensor.battery_level()
                 msg = Battery()
                 msg.battery_current = (current if current > 0.0 else 0.0)

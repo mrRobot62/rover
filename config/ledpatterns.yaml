@@ -1,0 +1,228 @@
+#----------------------------------------------------------------------------------------
+# LEDPatterns Build-Ino
+#
+# Diese Patterns können seitens eines Publishers direkt
+# mit der PatternID angesprochen werden und über folgende Attribute manipuliert werden
+#   - timeout
+#   - duration_on
+#   - duration_off
+#   - ledmask
+#
+# Gibt der Publisher lediglish die pattern_id in der Nachricht an, wird die Konfiguration
+# aus den nachfolgenden Einstellungen des jeweiligen Patterns verwendert
+#
+# Die Zahl (10:, 11: usw) entspricht der PatternID
+# PatternID 0-49 für spezial Themen
+# PatternID 50-99 für fill() Pattern
+# PatternID 100-149 für blink() Pattern
+# PatternID 150-199 für run() Pattern
+# PatternID 200-249 für circel() Pattern
+
+# ----------------------------------------------------------------------------------------
+# Standardwerte als YAML-Anker (kann bei jedem Pattern eingebunden und überschrieben werden)
+# ----------------------------------------------------------------------------------------
+anchors:
+  HR: &HR         # ring 4
+    ledmask: 0b1111111000000000000000000000
+  VR: &VR         # ring 3
+    ledmask: 0b0000000111111100000000000000
+  VL: &VL         # ring 2
+    ledmask: 0b0000000000000011111110000000
+  HL: &HL         # ring 2
+    ledmask: 0b0000000000000000000001111111
+  CENTER_ALL: &CENTER_ALL
+    ledmask: 0b0000001000000100000010000001
+  HAZARD: &HAZARD # Ring 1-4 aber ohne Center
+    ledmask: 0b1111110111111011111101111110
+  BLINK_LEFT: &BLINK_LEFT # RING 1 und RING2 (LEFT)
+    ledmask: 0b0000000000000001100010110001
+  BLINK_RIGHT: &BLINK_RIGHT # RING 3 und RING4 (RIGHT)
+    ledmask: 0b00011100001110000000000000000
+
+  defaults: &defaults
+    callback: "fill"
+    ledtype: "WS2812"
+    timeout: 0
+    duration_on: 0
+    duration_off: 0
+    brightness: 0.3
+    ledmask: 0x3FFFFF  # alle LEDs
+
+  defaults_blink: &defaults_blink
+    callback: "blink"
+    ledtype: "WS2812"
+    timeout: 2500
+    duration_on: 125
+    duration_off: 125
+    brightness: 0.3
+    ledmask: 0x3FFFFF  # alle LEDs
+
+
+# ----------------------------------------------------------------------------------------
+# Build-in Pattern:NONE, OFF, etc.
+# ----------------------------------------------------------------------------------------
+0:
+  <<: *defaults
+  name: "NONE"
+  color: [0, 0, 0]
+
+1:
+  <<: *defaults
+  name: "LED OFF"
+  color: [0, 0, 0]
+
+# ----------------------------------------------------------------------------------------
+# Build-in Pattern: fill() callback
+# ----------------------------------------------------------------------------------------
+
+# --- Vollfarben ---
+50:
+  <<: *defaults
+  name: "FILL RED"
+  color: [255, 0, 0]
+
+51:
+  <<: *defaults
+  name: "FILL GREEN"
+  color: [0, 255, 0]
+
+52:
+  <<: *defaults
+  name: "FILL BLUE"
+  color: [0, 0, 255]
+
+53:
+  <<: *defaults
+  name: "FILL YELLOW"
+  color: [255, 255, 0]
+
+54:
+  <<: *defaults
+  name: "FILL PINK"
+  color: [255, 0, 255]
+
+55:
+  <<: *defaults
+  name: "FILL WHITE"
+  color: [255, 255, 255]
+
+56:
+  <<: *defaults
+  name: "FILL AQUA"
+  color: [0, 255, 255]
+
+57:
+  <<: *defaults
+  name: "FILL LILA"
+  color: [174, 0, 255]
+
+58:
+  <<: *defaults
+  name: "FILL GREEN-YELLOW"
+  color: [189, 235, 52]
+
+59:
+  <<: *defaults
+  name: "FILL GREEN-BLUE"
+  color: [52, 235, 192]
+
+60:
+  <<: *defaults
+  name: "FILL ORANGE"
+  color: [235, 170, 50]
+
+# --- Battery ---
+61:
+  <<: [ *defaults]
+  name: "BAT100"
+  color: [51, 229, 0]
+  ledmask: 0b1111110111111011111101111110
+
+62:
+  <<: [*CENTER_ALL, *defaults]
+  name: "BAT90"
+  color: [0, 255, 0]
+  ledmask: 0b0111110011111001111100111110
+
+63:
+  <<: [*defaults]
+  name: "BAT80"
+  color: [102, 204, 0]
+  ledmask: 0b0011110001111000111100011110
+
+64:
+  <<: [*defaults]
+  name: "BAT70"
+  color: [153, 178, 0]
+  ledmask: 0b0001110000111000011100001110
+
+65:
+  <<: [*defaults]
+  name: "BAT60"
+  color: [204, 153, 0]
+  ledmask: 0b0000110000011000001100000110
+
+66:
+  <<: [*defaults]
+  name: "BAT50"
+  color: [255, 127, 0]
+  ledmask: 0b0000010000001000000100000010
+
+67:
+  <<: [*CENTER_ALL, *defaults]
+  name: "BAT40"
+  color: [255, 102, 0]
+
+68:
+  <<: [*CENTER_ALL, *defaults]
+  name: "BAT30"
+  color: [255, 76, 0]
+
+
+# ----------------------------------------------------------------------------------------
+# Build-in Pattern: blink() callback
+# ----------------------------------------------------------------------------------------
+100:
+  <<: [*HAZARD, *defaults]
+  name: "blink HAZARD"
+  color: [235, 170, 50]
+  duration_on: 125
+  duration_off: 125
+
+101:
+  <<: [*BLINK_LEFT, *defaults]
+  name: "blink BLINK_LEFT"
+  color: [235, 170, 50]
+  duration_on: 125
+  duration_off: 125
+
+102:
+  <<: [*BLINK_RIGHT, *defaults]
+  name: "blink BLINK_LEFT"
+  color: [235, 170, 50]
+  duration_on: 125
+  duration_off: 125
+
+103:
+  <<: [*defaults_blink]
+  name: "BAT0"
+  timeout: 8000
+  duration_on: 400
+  duration_off: 100 
+  color: [255, 0, 0]
+
+104:
+  <<: [*defaults_blink]
+  name: "BAT10"
+  timeout: 8000
+  duration_on: 500
+  duration_off: 500 
+  color: [255, 25, 0]
+
+105:
+  <<: [*CENTER_ALL, *defaults]
+  name: "BAT20"
+  color: [255, 51, 0]
+  timeout: 8000
+  duration_on: 500
+  duration_off: 500 

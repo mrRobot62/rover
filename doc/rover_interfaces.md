@@ -55,4 +55,5 @@ bernd@ros2pi5:~/ros2_ws$
 
 # Prüfen ob die Messages verfügbar sind
 
-
+Prüfen ob die erstelle Message auch verfügbar ist
+` ros2 interface show rover_interfaces/msg/LEDMessage`

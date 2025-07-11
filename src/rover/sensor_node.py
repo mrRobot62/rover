@@ -26,17 +26,17 @@ import random
 class SensorNode(LifecycleNode):
 
     battery_levels = [
-        (100, LEDPattern.BATTERY_100),
-        (90, LEDPattern.BATTERY_90),
-        (80, LEDPattern.BATTERY_80),
-        (70, LEDPattern.BATTERY_70),
-        (60, LEDPattern.BATTERY_60),
-        (50, LEDPattern.BATTERY_50),
-        (40, LEDPattern.BATTERY_40),
-        (30, LEDPattern.BATTERY_30),
-        (20, LEDPattern.BATTERY_20),
-        (10, LEDPattern.BATTERY_LOW),
-        (0,  LEDPattern.BATTERY_CRITICAL),
+        (100, LEDPattern.BATTERY_100.value),
+        (90, LEDPattern.BATTERY_90.value),
+        (80, LEDPattern.BATTERY_80.value),
+        (70, LEDPattern.BATTERY_70.value),
+        (60, LEDPattern.BATTERY_60.value),
+        (50, LEDPattern.BATTERY_50.value),
+        (40, LEDPattern.BATTERY_40.value),
+        (30, LEDPattern.BATTERY_30.value),
+        (20, LEDPattern.BATTERY_20.value),
+        (10, LEDPattern.BATTERY_10.value),
+        (0,  LEDPattern.BATTERY_0.value),
     ]
 
     def __init__(self):
@@ -264,11 +264,13 @@ class SensorNode(LifecycleNode):
 
 
     def __get_battery_pattern(self, percentage: int) -> int:
-
-        for threshold, level in self.battery_levels:
-            if percentage >= threshold:
-                return level.value
-        return LEDPattern.BATTERY_10.value
+        try:
+            for threshold, level in self.battery_levels:
+                if percentage >= threshold:
+                    return level
+            return LEDPattern.BATTERY_0.value
+        except Exception:
+            self.get_logger().warn("Pattern nicht definiert bezogen auf Level {percentage}")
 
     def publish_battery_state(self):
         try:
@@ -278,33 +280,40 @@ class SensorNode(LifecycleNode):
                 raw_v = round(self.batterySensor.read_voltage(),2)
                 level = self.batterySensor.battery_level(voltage)       # die aktuelle Messung wird genutzt
                 self.get_logger().info(f'(1) Battery State => ({level}%) | {voltage:.2f}V | {current:.2f}A')
-                # batStatus = self.batterySensor.get_battery_status(
-                #     self.battery_voltage_channel
-                # )
-                # pwrStatus = self.batterySensor.get_power_consumption(
-                #     current_channel=self.battery_current_channel,
-                #     high_power=self.acs712_type                    
-                # )
 
                 batStatus = BatteryStatus(voltage=voltage, level=level)
                 pwrStatus = PowerStatus(current)
 
-                msg = Battery()
-                msg.battery_voltage = batStatus.voltage
-                msg.battery_level = batStatus.level
-                msg.battery_current = pwrStatus.current
+                batMsg = Battery()
+                batMsg.battery_voltage = batStatus.voltage
+                batMsg.battery_level = batStatus.level
+                batMsg.battery_current = pwrStatus.current
 
-                self.get_logger().info(f'Battery State => ({msg.battery_level}%) | {msg.battery_voltage:.2f}V | {msg.battery_current:.2f}A')
+                self.get_logger().info(f'Battery State => ({batMsg.battery_level}%) | {batMsg.battery_voltage:.2f}V | {batMsg.battery_current:.2f}A')
             else:
                 self.get_logger().warn('BatterySensor nicht verfügbar ')
-                msg = Battery()
-                msg.battery_current = 0.0 # aktuell nicht genutzt
-                msg.battery_voltage = 0.0
-                msg.battery_level = 100
+                batMsg = Battery()
+                batMsg.battery_current = 0.0 # aktuell nicht genutzt
+                batMsg.battery_voltage = 0.0
+                batMsg.battery_level = 100
 
+            level = random.randrange(0,100,10)
             ledMsg = LEDMessage()
-            pattern = self.__get_battery_pattern(level)
-            self.get_logger().info(f'LED-Pattern: {pattern}')
+            ledMsg.ledtype = 'WS2812'
+            #
+            # Battery-Level auf ein LEDPattern mappen (z.B 90% => LEDPattern.BATTERY_90 mit value 62)
+            ledMsg.pattern = self.__get_battery_pattern(level)
+
+            # ledMsg.brightness = 0.3
+            # ledMsg.ledmask = 0b0000001000000100000010000001
+            # ledMsg.timeout = 2000 + ((100 - level)*10)       # je schwächer die Batterie desto länger der Timeout
+            # ledMsg.duration_on = 110 
+            # ledMsg.duration_off = 110 - (100 - level)       # je schwächer die Batterie desto schneller blinkt es
+            # ledMsg.pattern = LEDPattern.BATTERY_STATE.value
+
+            self.get_logger().info(f"Level '{level} => Pattern : {ledMsg.pattern}'")
+            self.led_publisher.publish(ledMsg)
+            self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")
 
 
         except Exception as e:
@@ -312,7 +321,7 @@ class SensorNode(LifecycleNode):
         
         # Publish direkt in topic
         try:
-            self.battery_publisher.publish(msg)
+            self.battery_publisher.publish(batMsg)
         except Exception as e:
             self.get_logger().warn(f'Konnte Batteriestatus nicht veröffentlichen: {e}')
 

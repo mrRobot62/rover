@@ -3,16 +3,23 @@ from rclpy.node import Node
 from .control.led_pattern import LEDPattern
 from .hardware.ws2812_driver import WS2812SPI
 from rover_interfaces.msg import LEDMessage
+from enum import Enum  # falls nicht schon vorhanden
+
+import yaml
+from ament_index_python.packages import get_package_share_directory
+import os
+import pprint
+
 # -------------------------------------------------------------------------------------------------------------------------------
 # mit ros2 interface show rover_interfaces/msg/LEDMessage
 # kann man sich anzeigen lassen ob das topic LEDMessage den korrekten aufbau hat
 # -------------------------------------------------------------------------------------------------------------------------------
 
-def generate_bitmask(start: int, end: int) -> int:
-    """Setze Bits von start bis end (inklusiv)."""
-    if not (0 <= start <= end < 32):
-        raise ValueError("start und end müssen zwischen 0 und 31 liegen.")
-    return ((1 << (end - start + 1)) - 1) << start
+# def generate_bitmask(start: int, end: int) -> int:
+#     """Setze Bits von start bis end (inklusiv)."""
+#     if not (0 <= start <= end < 32):
+#         raise ValueError("start und end müssen zwischen 0 und 31 liegen.")
+#     return ((1 << (end - start + 1)) - 1) << start
 
 class LEDUtils:
     """
@@ -29,12 +36,19 @@ class LEDUtils:
         'LV': (7, 13),   # Links vorne (LED8–14)
         'RV': (14, 20),  # Rechts vorne (LED15–21)
         'RH': (21, 27),  # Rechts hinten (LED22–28)
+        'CLH': (0,0),    # Center LH
+        'CLV': (7,7),    # Center LH
+        'CRV': (14,14),    # Center RV
+        'CRH': (21,21),    # Center RH
+
     }
 
     # Definition für vordefinierte Kombinationen
     COMBINATIONS = {
         'LEFT_ALL': ['LH', 'LV'],
         'RIGHT_ALL': ['RV', 'RH'],
+        'CENTERH' : ['CLH','CRH'],
+        'CENTERA' : ['CLV','CRV','CLH','CRH'],
         'ALL' : ['LH','LV','RV','RH'],
     }
 
@@ -86,9 +100,12 @@ class LEDPatternConfig:
     def __init__(self, pattern_id: int, pattern_name=str, led_type="WS2812", duration: int=0, timeout: int=0, callback=None, callback_param=None):
         """ 
         LEDPattern.
-        Im Prinzip ist die Klasse nur ein Platzhalter für die Konfiguration. Die eigentlichen Paremter und die Callbackfunktion die das
+        Im Prinzip ist die Klasse nur ein Platzhalter für die Konfiguration. Die eigentlichen Paramemter und die Callbackfunktion die das
         tatsächliche LED-Muster darstellt werden im callback und callback_param übergeben.
 
+        
+        LEDPattern=1 = DEFAULT
+        das ist ein Pattern das genutzt werden kann, wenn der Publisher im Prinzip alle Attribute selber setzen möchte
 
         @param pattern_id entspricht der ID aus der Enumeration
         @param pattern_name Name des Musters
@@ -99,14 +116,113 @@ class LEDPatternConfig:
         self.pattern_name = pattern_name
         self.led_type = led_type
         self.duration = duration
-        # self.duration_on = duration_on
-        # self.duration_off = duration_off
-        # self.ledmask = ledmask
-        # self.timeout = timeout
         self.callback = callback
         self.callback_param = callback_param
         if self.led_type == "WS2812":
             self.led = WS2812SPI()
+        else:
+            # wenn alle Stricke reißen ;-)
+            self.led = WS2812SPI()
+
+
+class LEDPatternLoader:
+    """ liest eine YAML Patterndatei
+    Der Key entspricht dem Wert der in LEDPattern(Enum) definiert wurde
+    Zurückgegeben Struktur als Beispiel:
+    {
+        0: {
+            'callback': 'fill',
+            'timeout': 0,
+            'duration_on': 0,
+            'duration_off': 0,
+            'brightness': 0.3,
+            'ledmask': 0x3FFFFF,           # int-Wert (nicht String)
+            'name': 'NONE',
+            'color': [0, 0, 0]
+        },
+        50: {
+            'callback': 'fill',
+            'timeout': 0,
+            'duration_on': 0,
+            'duration_off': 0,
+            'brightness': 0.3,
+            'ledmask': 0x3FFFFF,
+            'name': 'FILL RED',
+            'color': [255, 0, 0]
+        },
+        61: {
+            'callback': 'blink',
+            'timeout': 0,
+            'duration_on': 125,
+            'duration_off': 125,
+            'brightness': 0.3,
+            'ledmask': 0b0000001000000100000010000001,
+            'name': 'BAT100',
+            'color': [51, 229, 0]
+        },
+        ...
+    }
+    
+    
+    """
+
+    def __init__(self, path:str, file:str, logger):
+        self.logger = logger
+        self.pattern_file = os.path.join(
+            get_package_share_directory('rover'),
+            path,
+            file
+        )
+        self.logger.info(f"[LEDPatternLoader] {self.pattern_file}")
+
+    def load_yaml(self, led_type="WS2812"):
+        with open( self.pattern_file, 'r') as f:
+            raw_data = yaml.safe_load(f)
+
+        pattern_dict = {}
+
+        for pattern_id, entry in raw_data.items():
+            try:
+                pattern_id = int(pattern_id)  # YAML keys sind Strings
+                name = entry.get("name", f"PATTERN_{pattern_id}")
+                callback = entry.get("callback", "fill")  # fallback auf "fill"
+                timeout = entry.get("timeout", 0)
+                duration_on = entry.get("duration_on", 0)
+                duration_off = entry.get("duration_off", 0)
+                duration = entry.get("duration", 0)  # optional für spätere Erweiterung
+                brightness = entry.get("brightness", 0.3)
+                ledmask = entry.get("ledmask", 0x3FFFFF)
+                color = entry.get("color", [0, 0, 0])
+
+                callback_param = {
+                    "color": color,
+                    "timeout": timeout,
+                    "duration_on": duration_on,
+                    "duration_off": duration_off,
+                    "brightness": brightness,
+                    "ledmask": ledmask
+                }
+
+                pattern_obj = LEDPatternConfig(
+                    pattern_id=pattern_id,
+                    pattern_name=name,
+                    led_type=led_type,
+                    duration=duration,
+                    timeout=timeout,
+                    callback=callback,
+                    callback_param=callback_param
+                )
+
+                pattern_dict[pattern_id] = pattern_obj
+            except ValueError:
+                # Kein int → ignoriere z.B. "HR", "defaults", etc.
+                print(f"[YAML Load] Überspringe Eintrag: '{pattern_id}' (kein numerischer Pattern-Key)")
+
+            except Exception as e:
+                print(f"[YAML Load] Fehler bei Pattern-ID {pattern_id}: {e}")
+
+        return pattern_dict
+
 
 #------------------------------------------------------------------------------------------------------------# der eigentliche LEDNode
 # generischer Aufbau, der Publisher für ein LEDMuster, kann entweder sich auf 
@@ -128,7 +244,7 @@ class LEDNode(Node):
             ('led_default_timeout', 1000),
             ('led_default_duration_on', 500),
             ('led_default_duration_off', 500),
-            ('led_default_ledmask', 0b01010101), # auffallendes LED-Muster
+            ('led_default_ledmask',0x555555), # auffallendes LED-Muster
         ])
         self.led_topic = self.get_parameter('led_topic').get_parameter_value().string_value
         self.led_num_pixel = self.get_parameter('led_num_pixels').get_parameter_value().integer_value
@@ -151,171 +267,11 @@ class LEDNode(Node):
         DurationON:     {self.led_default_duration_on},
         DurationOFF:    {self.led_default_duration_off},
         """)
-        self.pattern = {
-            LEDPattern.OFF: LEDPatternConfig(LEDPattern.OFF, 
-                "OFF", 
-                duration=0, 
-                timeout=0, 
-                callback='off', 
-                callback_param={
-                    "color":None,
-                    "timeout": None,
-                    "duration_on": None,
-                    "duration_off": None,
-                    "ledmask" : 0b0,
-                    "brightness": 0
-                }
-            ),
-            LEDPattern.RED: LEDPatternConfig(LEDPattern.RED, 
-                "FILL RED", 
-                duration=0, 
-                timeout=0, 
-                callback='fill', 
-                callback_param={
-                    "color":(255, 0, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),
-            LEDPattern.GREEN: LEDPatternConfig(LEDPattern.GREEN, 
-                "FILL GREEN", 
-                duration=0, 
-                timeout=0, 
-                callback='fill', 
-                callback_param={
-                    "color":(0, 255, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),
-            LEDPattern.BLUE: LEDPatternConfig(LEDPattern.BLUE, 
-                "FILL BLUE", 
-                duration=0, 
-                timeout=0, 
-                callback='fill', 
-                callback_param={
-                    "color":(0, 0, 255),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),
-            LEDPattern.ORANGE: LEDPatternConfig(LEDPattern.ORANGE, 
-                "FILL ORANGE", 
-                duration=0, 
-                timeout=0, 
-                callback='fill', 
-                callback_param={
-                    "color":(250, 165, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),
-            LEDPattern.WHITE: LEDPatternConfig(LEDPattern.WHITE, 
-                "FILL WHITE", 
-                duration=0, 
-                timeout=0, 
-                callback='fill', 
-                callback_param={
-                    "color":(255, 255, 255),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),            
-            LEDPattern.BLINK_LEFT: LEDPatternConfig(LEDPattern.BLINK_LEFT, 
-                "BLINK LEFT", 
-                duration=0, 
-                timeout=0, 
-                callback='blink', 
-                callback_param={
-                    "color":(255, 165, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    # cooler Trick, ich steuer die linken Ringe komplett an schränke aber über den zweiten Parameter
-                    # die tatsächlcihen LEDs ein. in dem Fall sind es jeweils LED2,3,7
-                    "ledmask" : LEDUtils.combination_mask('LEFT_ALL', {'LH':0b001000110, 'LV':0b001000110})
-                }
-            ),             
-            LEDPattern.BLINK_RIGHT: LEDPatternConfig(LEDPattern.BLINK_RIGHT,
-                "BLINK RIGHT", 
-                duration=0, 
-                timeout=0, 
-                callback='blink', 
-                callback_param={
-                    "color":(255, 165, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    # cooler Trick, ich steuer die linken Ringe komplett an schränke aber über den zweiten Parameter
-                    # die tatsächlcihen LEDs ein. in dem Fall sind es jeweils LED3,4,5
-                    "ledmask" : LEDUtils.combination_mask('RIGHT_ALL', {'RV':0b00111000, 'RH':0b00111000})
-                }
-            ),             
-            LEDPattern.HAZARD_LIGHT: LEDPatternConfig(LEDPattern.HAZARD_LIGHT, 
-                "HAZARD", 
-                duration=0, 
-                timeout=0, 
-                callback='blink', 
-                callback_param={
-                    "color":(255, 165, 0),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": self.led_default_duration_on, 
-                    "duration_off": self.led_default_duration_off, 
-                    "brightness": self.led_default_brightness,
-                    # cooler Trick, ich steuer die linken Ringe komplett an schränke aber über den zweiten Parameter
-                    # die tatsächlcihen LEDs ein. in dem Fall sind es jeweils LED3,4,5
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ),             
-            LEDPattern.ROVER_BOOT1: LEDPatternConfig(LEDPattern.ROVER_BOOT1, 
-                "ROVER_BOOT1", 
-                duration=0, 
-                timeout=0, 
-                callback='circle', 
-                callback_param={
-                    "color":(10, 10, 255),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": 50, 
-                    "duration_off": 25, 
-                    "brightness": self.led_default_brightness,
-                    # cooler Trick, ich steuer die linken Ringe komplett an schränke aber über den zweiten Parameter
-                    # die tatsächlcihen LEDs ein. in dem Fall sind es jeweils LED3,4,5
-                    "ledmask" : LEDUtils.combination_mask('ALL')
-                }
-            ), 
-            LEDPattern.ROVER_BOOT2: LEDPatternConfig(LEDPattern.ROVER_BOOT2, 
-                "ROVER_BOOT2", 
-                duration=0, 
-                timeout=0, 
-                callback='circle', 
-                callback_param={
-                    "color":(50, 255, 70),
-                    "timeout":self.led_default_timeout, 
-                    "duration_on": 50, 
-                    "duration_off": 25, 
-                    "brightness": self.led_default_brightness,
-                    "ledmask" : 0b0 # bei circle wird keine ledmask genutzt
-                }
-            ), 
-        }
 
+        patternLoader = LEDPatternLoader("config", "ledpatterns.yaml", self.get_logger())
+        self.yamlPattern = patternLoader.load_yaml()
+        self.get_logger().info(f"Verfügbare Pattern-IDs: {list(self.yamlPattern.keys())}")
+  
         self.subscription = self.create_subscription(
             LEDMessage,
             self.led_topic,
@@ -325,70 +281,130 @@ class LEDNode(Node):
 
         self.get_logger().info('LEDNode gestartet')
 
-    def _param_override(self, msg_value, default_value):
-        return msg_value if msg_value >= 0 else default_value
+    def resolve_value(self, msg_value, default_value):
+        """
+        Entscheidet, ob der vom Publisher gesendete Wert (msg_value)
+        benutzt werden soll, oder ob der Default-Wert verwendet wird.
 
-    def validate_led_pattern(self, pattern_id: int) -> int:
+        Die Logik:
+        - Für Zahlen (int, float): alles außer None wird verwendet, auch 0
+        - Für Listen/Tupel (z. B. color): wird verwendet, wenn nicht exakt [0,0,0]
+        - Für Strings: wird verwendet, wenn nicht leer
+        - Für None: default wird genommen
+        """
+        if msg_value is None:
+            return default_value
+
+        if isinstance(msg_value, (int, float)):
+            return msg_value
+
+        if isinstance(msg_value, (list, tuple)):
+            if msg_value == [0, 0, 0] or msg_value == (0, 0, 0):
+                return default_value
+            return msg_value
+
+        if isinstance(msg_value, str):
+            return msg_value if msg_value.strip() else default_value
+
+        # fallback für alles andere
+        return msg_value
+
+
+    def validate_led_pattern(self, pattern_id: int) -> bool:
         """
         Prüft, ob pattern_id ein gültiger Wert der LEDPattern-Enum ist.
         
         :param pattern_id: Integer-Wert, der überprüft werden soll
-        :return: Gültige pattern_id oder 0, falls ungültig
+        :return: True/False
         """
         try:
             LEDPattern(pattern_id)
-            return pattern_id
+            return True
         except ValueError:
-            self.get_logger().warn(f"Publisher nutzt eine ungültige LEDPatternID: {pattern_id}")
-            return 0
+            return False
 
     def led_callback(self, msg):
         #
         # ist die empfangene patternID eine valide ID? Wenn nein wird 0 angenommen
-        pattern_id = self.validate_led_pattern(msg.pattern)
-        pattern_id = LEDPattern(pattern_id)  # kommt vom Publisher
-
-        # das LEDPatternConfog-Object wird benötigt um die tatsächlich konfigurierten Parameter
-        # auszulesen. diese werden dann im eigentlichen Callback übergeben
-        obj = self.pattern[pattern_id]
-        
-        config = self.pattern.get(pattern_id)
-
-        if not config:
-            self.get_logger().warn(f"Unbekanntes Pattern: {msg.pattern}")
-            return
+        self.get_logger().info(f"Subscribed Message: {msg}")
 
         #
-        # Python-Trick
-        # getattr liest aus, welche Attribute ein objekt besitzt. In unserem Fall benötigen wir den Inhalt
-        # des Callback-Attributes.
-        # Hier steht der Methodenname drin, der aufgerufen werden soll.
-        # config.led entspricht dem LED-Type (z.B WS2812)
-
-        method = getattr(config.led, config.callback, None)
-        #
-        if method is None:
-            self.get_logger().error(f"Methode {config.callback} nicht gefunden")
+        # Ist die PatternID eine valide ID?
+        pattern_id = msg.pattern
+        if self.validate_led_pattern(pattern_id) == False:
+            self.get_logger().warn(f"Publisher nutzt eine ungültige LEDPatternID: {pattern_id}")
             return
-        
+       
+        #
+        # in yamlPattern wurde für jedes Pattern ein Objekt generiert vom Type LEDPatternConfig
+        # diese Objekt enthält nun alle notwendigen Konfiguraitonsdaten für das Pattern als auch
+        # die callback funktion die letztendlich die LEDs ansteuert.
+
+        patternObj = self.yamlPattern.get(pattern_id)
+        if patternObj is None:
+            self.get_logger().warn(f"PatternID wurde nicht in yamlPattern gefunden: {pattern_id}")
+            return
+        self.get_logger().debug(f"---- [LEDNode] MSG.pattern: {pattern_id}; Pattern: {patternObj.pattern_name}")
+
+        #
+        # nun wird der callback funktionsname benötigt. dieser ist im patternObj schon enthalten
+        # des weiteren steckt im Objekt auch ein Klassenverweis zum LEDType (z.B WS2812()) drin
+        # über diese Klasse wird dann der callback aufgerufen
+        # WS2812.fill()
+        callbackFnc = patternObj.callback
+
+        #
+        # Python-Hack
+        # mit der Funktion getattr liest man aus, welche Attribute ein Objekt hat (z.B. WS2812())
+        # Da wir ja den LEDDriver (WS2812) nutzen, benötigen wir nun die Methoden die diese Klasse zur
+        # Verfügung stellt (fill(), blink(), run(), circle()) im Prinzip sind das die callback funktionen
+        callback = getattr(patternObj.led, callbackFnc, None)
+        self.get_logger().debug(f"---- [LEDNode] callbackFnc: {callbackFnc} Object: {callback}")
+
+        #
+        # gibts die funktion überhaupt im LED_Driver?
+        if callback is None:
+            self.get_logger().error(f"Methode {callbackFnc} nicht gefunden")
+            return        
+
+        self.get_logger().debug(f"---- [LEDNode] callbackParam: \n{pprint.pformat(patternObj.callback_param)}")
+
+        #
+        # Nun müssen wir die korrekten Parameter noch setzen
+        # in der YAML-Datei wurden für das aktuelle Pattern alle notwendigen Parameter per default 
+        # gesetzt. Der Publish kann diese aber überschreiben
+        #
+        # resolve_value() setzt entweder den wert aus der Message oder sonst den default wert aus dem PatternObj
         user_params = {
-            "timeout": self._param_override(msg.timeout, obj.callback_param["timeout"]),
-            "duration_on": self._param_override(msg.duration_on, obj.callback_param["duration_on"]),
-            "duration_off": self._param_override(msg.duration_off, obj.callback_param["duration_off"]),
-            "brightness": self._param_override(msg.brightness,obj.callback_param["brightness"]),
-            "ledmask": self._param_override(msg.ledmask, obj.callback_param["ledmask"])
+            "timeout": self.resolve_value(msg.timeout, patternObj.callback_param["timeout"]),
+            "duration_on": self.resolve_value(msg.duration_on, patternObj.callback_param["duration_on"]),
+            "duration_off": self.resolve_value(msg.duration_off, patternObj.callback_param["duration_off"]),
+            "brightness": self.resolve_value(msg.brightness,patternObj.callback_param["brightness"]),
+            "ledmask": self.resolve_value(msg.ledmask, patternObj.callback_param["ledmask"]),
+            "color" : self.resolve_value(msg.color, patternObj.callback_param["color"]),
         }
 
+        user_params = {
+            "timeout": patternObj.callback_param["timeout"],
+            "duration_on": patternObj.callback_param["duration_on"],
+            "duration_off": patternObj.callback_param["duration_off"],
+            "brightness": patternObj.callback_param["brightness"],
+            "ledmask": patternObj.callback_param["ledmask"],
+            "color" : patternObj.callback_param["color"],
+        }
+
+        self.get_logger().info(f"---- [LEDNode] user_params: \n{pprint.pformat(user_params)}")
+
         # überschreibt config.callback_param
-        params = {**config.callback_param, **user_params}
+        params = {**patternObj.callback_param, **user_params}
         self.get_logger().info(
-            f"Aktiviere Pattern {config.pattern_name} \n\t{config.callback} mit Parametern {params} LEDMaskBitPattern: {bin(params['ledmask'])}"
+            f"Aktiviere Pattern {patternObj.pattern_name} \n\t{patternObj.callback} mit Parametern {params} LEDMaskBitPattern: {bin(params['ledmask'])}"
         )
         # das ist der eigentliche Methoden-Aufruf mit übergabe der Parameter.
-
-        method(**params)
+        # es wird der Platzhalter callback genutzt um die tatsächliche Methode aufzurufen
+        callback(**params)
         self.get_logger().info(
-            f"[method(**params)]: Call {config.led} Mask:{bin(params['ledmask'])}"
+            f"[method(**params)]: Call {patternObj.led} Mask:{bin(params['ledmask'])}"
         )
 
 def main(args=None):

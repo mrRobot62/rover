@@ -4,64 +4,46 @@ class LEDPattern(Enum):
     """
     Enumeration zur einfacheren Nutzung der unterschiedlichen Patterns
     """
-    # fill()
-    RED=0
-    GREEN=1
-    BLUE=2
-    ORANGE=3
-    WHITE=4
+    NONE=0
+    OFF=1
+    UNKNOWN_ERROR=10
 
-    # blink()
-    BLINK_LEFT = 10
-    BLINK_RIGHT = 11
-    HAZARD_LIGHT = 12
-    
+
     # fill()
+    RED=50
+    GREEN=51
+    BLUE=52
+    YELLOW=53
+    PINK=54
+    WHITE=55
+    AQUA=56
+    LILA=57
+    GREENYELLOW=58
+    GREENBLUE=59
+    ORANGE=60
+
     # Battery-Level
-    BATTERY_100 = 100
-    BATTERY_90 = 101
-    BATTERY_80 = 102
-    BATTERY_70 = 103
-    BATTERY_60 = 104
-    BATTERY_50 = 105
-    BATTERY_40 = 106
-    BATTERY_30 = 106
-    BATTERY_20 = 107
+    BATTERY_100 = 61
+    BATTERY_90 = 62
+    BATTERY_80 = 63
+    BATTERY_70 = 64
+    BATTERY_60 = 65
+    BATTERY_50 = 66
+    BATTERY_40 = 67
+    BATTERY_30 = 68
+    BATTERY_20 = 69
+    BATTERY_10 = 70
+
+    # blink()
+    HAZARD = 100
+    BLINK_LEFT = 101
+    BLINK_RIGHT = 102
     
     # blink()
-    BATTERY_10 = 108
-    BATTERY_LOW = 109
-    BATTERY_CRITICAL = 110
-
-    # Rover - driver_controller_node
-    # blink()
-    DYNA_NOT_AVAILABLE = 200
-    DYNA_PROBLEM = 201
-    I2C_ESP32_NOT_FOUND = 250
-    I2C_ESP32_STATE_ERR = 251
-
-    # Rover - navigation_node
-    # 300-399
-    #     
-    # Rover - vision_node
-    # 400 - 499
-
-    # Rover - odom_node
-    # 500 - 599
-
-    # Rover
-    # Software
-    PI_WIFI_NOT_AVAILABLE = 500
-
-    # circle()
-    ROVER_BOOT1 = 510
-    ROVER_BOOT2 = 511
-    ROVER_BOOT3 = 512
-    ROVER_SHUTDOWN1 = 515
-    ROVER_SHUTDOWN2 = 516
+    BATTERY_0 = 103
 
 
-    UNKNOWN_ERROR = 1000
-    OFF = 9999
+
+
 
 

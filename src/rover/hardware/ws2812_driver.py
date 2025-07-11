@@ -64,7 +64,7 @@ class WS2812SPI:
             frequency=6400000,     # für 800 kHz NeoPixel
             reset_time=80e-6       # 80 µs Pause nach jedem Frame
         )
-        print (f"Pixels: {num_pixels},{bin(ledmask)}")
+        #print (f"Pixels: {num_pixels},{bin(ledmask)}")
 
     def apply_brightness(self, color):
         """Helligkeit auf Farbwert anwenden (lokal, nicht global)."""

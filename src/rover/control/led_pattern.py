@@ -23,16 +23,16 @@ class LEDPattern(Enum):
     ORANGE=60
 
     # Battery-Level
-    BATTERY_100 = 61
-    BATTERY_90 = 62
-    BATTERY_80 = 63
-    BATTERY_70 = 64
-    BATTERY_60 = 65
-    BATTERY_50 = 66
-    BATTERY_40 = 67
-    BATTERY_30 = 68
-    BATTERY_20 = 69
-    BATTERY_10 = 70
+    BATTERY_100=61
+    BATTERY_90=62
+    BATTERY_80=63
+    BATTERY_70=64
+    BATTERY_60=65
+    BATTERY_50=66
+    BATTERY_40=67
+    BATTERY_30=68
+    BATTERY_20=105
+    BATTERY_10=104
 
     # blink()
     HAZARD = 100

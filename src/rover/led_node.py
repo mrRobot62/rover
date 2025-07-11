@@ -328,23 +328,61 @@ class LEDNode(Node):
         # ist die empfangene patternID eine valide ID? Wenn nein wird 0 angenommen
         self.get_logger().info(f"Subscribed Message: {msg}")
 
+        # Werte aus der Message:
+        # - wenn Publisher pattern > 0 sendet, dann wird das build-in Pattern verwendet 
+        #   und eine etwaige color=[r,g,b] Angabe in der Message ignoriert
+        # - timeout > 0, dann wird dieser Wert den build-in Wert überschreiben
+        # - duration_on/off > 0, dann werden diese Werte den build-in Wert überschreiben
+        # - wenn Pattern = 0 (NONE), dann wird der wert color[r,g,b] verwendet, 
+        #   vorausgesetz color ist ungleich [0,0,0] (keine LED)
         #
-        # Ist die PatternID eine valide ID?
-        pattern_id = msg.pattern
-        if self.validate_led_pattern(pattern_id) == False:
-            self.get_logger().warn(f"Publisher nutzt eine ungültige LEDPatternID: {pattern_id}")
-            return
-       
         #
         # in yamlPattern wurde für jedes Pattern ein Objekt generiert vom Type LEDPatternConfig
         # diese Objekt enthält nun alle notwendigen Konfiguraitonsdaten für das Pattern als auch
         # die callback funktion die letztendlich die LEDs ansteuert.
-
+        pattern_id = 0
+        if msg.pattern > 0 :
+            # color wird mit default übernommen
+            # Ist die PatternID eine valide ID?
+            pattern_id = msg.pattern
+            if self.validate_led_pattern(pattern_id) == False:
+                self.get_logger().warn(f"Publisher nutzt eine ungültige LEDPatternID: {pattern_id}")
+                return
+            
         patternObj = self.yamlPattern.get(pattern_id)
         if patternObj is None:
             self.get_logger().warn(f"PatternID wurde nicht in yamlPattern gefunden: {pattern_id}")
             return
         self.get_logger().debug(f"---- [LEDNode] MSG.pattern: {pattern_id}; Pattern: {patternObj.pattern_name}")
+
+        #
+        # user_params mit default-Werte vorbereiten
+        user_params = {}
+        user_params.setdefault("timeout", patternObj.callback_param["timeout"])
+        user_params.setdefault("duration_on", patternObj.callback_param["duration_on"])
+        user_params.setdefault("duration_off", patternObj.callback_param["duration_off"])
+        user_params.setdefault("brightness", patternObj.callback_param["brightness"])
+        user_params.setdefault("color", patternObj.callback_param["color"])
+        user_params.setdefault("ledmask", patternObj.callback_param["ledmask"])
+        self.get_logger().debug(f"---- [PATTERN:{pattern_id}] DEFAULT params \n{pprint.pformat(user_params)}")
+
+        # parameter für die Übergabe an die Callback vorbereiten
+
+        if pattern_id == 0:
+            # color aus der Message übernehmen
+            user_params["color"][:] = msg.color
+
+        #
+        # Wenn ein Attribut in der Message nicht gesetzt wird ist der Wert per default 0 oder 0.0 oder ''
+        # wenn man nun aber explizit timeout, duration_on/off nicht setzen möchte
+        # muss man diese Werte in der Message auf -1 setzen, in solchen Fällen wird dann der
+        # default wert nicht überschrieben
+        user_params["timeout"] = msg.timeout if msg.timeout >= 0 else user_params.get("timeout")
+        user_params["duration_on"] = msg.duration_on if msg.duration_on >= 0 else user_params.get("duration_on")
+        user_params["duration_off"] = msg.duration_off if msg.duration_off >= 0 else user_params.get("duration_off")
+        user_params["brightness"] = msg.brightness if msg.brightness >= 0 else user_params.get("brightness")
+        user_params["ledmask"] = msg.ledmask if msg.ledmask != 0 else user_params.get("ledmask")
+        self.get_logger().debug(f"---- [PATTERN:{pattern_id}] USER params \n{pprint.pformat(user_params)}")
 
         #
         # nun wird der callback funktionsname benötigt. dieser ist im patternObj schon enthalten
@@ -367,36 +405,10 @@ class LEDNode(Node):
             self.get_logger().error(f"Methode {callbackFnc} nicht gefunden")
             return        
 
-        self.get_logger().debug(f"---- [LEDNode] callbackParam: \n{pprint.pformat(patternObj.callback_param)}")
-
-        #
-        # Nun müssen wir die korrekten Parameter noch setzen
-        # in der YAML-Datei wurden für das aktuelle Pattern alle notwendigen Parameter per default 
-        # gesetzt. Der Publish kann diese aber überschreiben
-        #
-        # resolve_value() setzt entweder den wert aus der Message oder sonst den default wert aus dem PatternObj
-        user_params = {
-            "timeout": self.resolve_value(msg.timeout, patternObj.callback_param["timeout"]),
-            "duration_on": self.resolve_value(msg.duration_on, patternObj.callback_param["duration_on"]),
-            "duration_off": self.resolve_value(msg.duration_off, patternObj.callback_param["duration_off"]),
-            "brightness": self.resolve_value(msg.brightness,patternObj.callback_param["brightness"]),
-            "ledmask": self.resolve_value(msg.ledmask, patternObj.callback_param["ledmask"]),
-            "color" : self.resolve_value(msg.color, patternObj.callback_param["color"]),
-        }
-
-        user_params = {
-            "timeout": patternObj.callback_param["timeout"],
-            "duration_on": patternObj.callback_param["duration_on"],
-            "duration_off": patternObj.callback_param["duration_off"],
-            "brightness": patternObj.callback_param["brightness"],
-            "ledmask": patternObj.callback_param["ledmask"],
-            "color" : patternObj.callback_param["color"],
-        }
-
-        self.get_logger().info(f"---- [LEDNode] user_params: \n{pprint.pformat(user_params)}")
-
         # überschreibt config.callback_param
         params = {**patternObj.callback_param, **user_params}
+        self.get_logger().debug(f"---- [LEDNode] callbackParam: \n{pprint.pformat(patternObj.callback_param)}")
+
         self.get_logger().info(
             f"Aktiviere Pattern {patternObj.pattern_name} \n\t{patternObj.callback} mit Parametern {params} LEDMaskBitPattern: {bin(params['ledmask'])}"
         )

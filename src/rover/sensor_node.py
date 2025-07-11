@@ -297,23 +297,22 @@ class SensorNode(LifecycleNode):
                 batMsg.battery_voltage = 0.0
                 batMsg.battery_level = 100
 
-            level = random.randrange(0,100,10)
+            # nur zum Testen
+            #level = random.randrange(0,100,10)
+
+            #
+            # LED Message vorbereiten um den Batterie-Status darzustellen
             ledMsg = LEDMessage()
+            level = 30
             ledMsg.ledtype = 'WS2812'
             #
             # Battery-Level auf ein LEDPattern mappen (z.B 90% => LEDPattern.BATTERY_90 mit value 62)
             ledMsg.pattern = self.__get_battery_pattern(level)
-
-            # ledMsg.brightness = 0.3
-            # ledMsg.ledmask = 0b0000001000000100000010000001
-            # ledMsg.timeout = 2000 + ((100 - level)*10)       # je schwächer die Batterie desto länger der Timeout
-            # ledMsg.duration_on = 110 
-            # ledMsg.duration_off = 110 - (100 - level)       # je schwächer die Batterie desto schneller blinkt es
-            # ledMsg.pattern = LEDPattern.BATTERY_STATE.value
-
             self.get_logger().info(f"Level '{level} => Pattern : {ledMsg.pattern}'")
-            self.led_publisher.publish(ledMsg)
-            self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")
+            #
+            # und im topic veröffentlichen
+            #self.led_publisher.publish(ledMsg)
+            #self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")
 
 
         except Exception as e:

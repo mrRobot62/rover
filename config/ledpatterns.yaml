@@ -212,7 +212,7 @@ anchors:
   color: [255, 0, 0]
 
 104:
-  <<: [*defaults_blink]
+  <<: *defaults_blink
   name: "BAT10"
   timeout: 8000
   duration_on: 500
@@ -220,7 +220,7 @@ anchors:
   color: [255, 25, 0]
 
 105:
-  <<: [*CENTER_ALL, *defaults]
+  <<: *defaults
   name: "BAT20"
   color: [255, 51, 0]
   timeout: 8000

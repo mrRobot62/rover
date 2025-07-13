@@ -40,7 +40,8 @@ i2c_node:
     i2c_write_topic: "/i2c/write"
     # publish einen Value der von einen I2C Slave empfangen wurde
     i2c_read_topic: "/i2c/read"
-    timer_update: 0.5
+    i2c_timer_update: 0.5
+    i2c_timer_periodic_update: 10.0
     i2c_bus_id: 1
     i2c_esp32_addr: 0x12
     i2c_esp32_raise_onerror: True

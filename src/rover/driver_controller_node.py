@@ -37,6 +37,21 @@ class JOYSTICKS(Enum):
     PAD_UD = 5      # JoyPad
 
 class DriverControllerNode(Node):
+    """
+    Der DriverControllNode steuert über den I2C_Node die Verbindung zum ESP indem er eine
+    I2CWrite Topic-Nachricht generiert und published.
+
+    Publish-Messagess: (OUT)
+    - /i2c/I2CWrite: Message zu Steuerung des ESP32
+    - /led : LEDMessage Anzeige von LEDPattern (z.B blinken, Warnblinker, ...)
+
+    SUBSCRIBE-Messages: (IN)    
+    - /joy : Daten des Gamepad-Controllers
+
+
+    """
+
+
     def __init__(self):
         super().__init__('driver_controller_node')
         self.node_name = self.__class__.__name__
@@ -62,19 +77,18 @@ class DriverControllerNode(Node):
         self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
 
         self.get_logger().info(
-f"""
-DriverControllerNode(Node) config:\n\
---------------------------------
-cmd_vel_topic:          {self.cmd_vel_topic}
-reverse_steering:       {self.reverse_steering}
-reverse_velocity:       {self.reverse_velocity}
-map_js_steering:        {self.map_js_steering}
-map_js_velocity:        {self.map_js_velocity}
-map_js_cam_turn:        {self.map_js_cam_turn}
-map_js_cam_tilt:        {self.map_js_cam_tilt}
-""")
+        f"""
+            DriverControllerNode(Node) config:\n\
+            --------------------------------
+            cmd_vel_topic:          {self.cmd_vel_topic}
+            reverse_steering:       {self.reverse_steering}
+            reverse_velocity:       {self.reverse_velocity}
+            map_js_steering:        {self.map_js_steering}
+            map_js_velocity:        {self.map_js_velocity}
+            map_js_cam_turn:        {self.map_js_cam_turn}
+            map_js_cam_tilt:        {self.map_js_cam_tilt}
+        """)
         
-#        self.get_logger().info(f"")
         self.get_logger().info(f"create publisher für I2CWrite")
         self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
         self.get_logger().info(f"create publisher für LEDMessages")
@@ -121,6 +135,37 @@ map_js_cam_tilt:        {self.map_js_cam_tilt}
         self.get_logger().info(f'LED Pattern {pattern_id} gesendet')
 
     def publish_steering_velocity(self, steering, velocity):
+        """ veröffentlicht ein Message in /2cd/I2CWrite"""
+
+        #--------------------------------------------------------------------
+        # Aufbau einer I2CWrite - Message
+        # ros2 interface show rover_interfaces/msg/I2CWrite
+        #--------------------------------------------------------------------
+        # #-------------------------
+        # # I2C V01 Version
+        # #-------------------------
+        # # grundlegendes Kommando was an den ESP
+        # # verwendet wird
+        # string command
+
+        # #
+        # # Liste der PINS die angesprochen werden
+        # int32[] pins
+        # #
+        # # List der States die ein Pin annehmen soll
+        # int32[] states
+        # #
+        # #
+        # int32 cmd
+        # #
+        # #
+        # int32 subcmd
+        # #
+        # # Liste von 5 Werten. Publisher
+        # # senden float, Wert wird mit 100 Multipliziert
+        # # um uint16 Wert zu erhalten
+        # float64[] data
+
         msg = I2CWrite()
         msg.command = "servo"
         msg.cmd = 1
@@ -130,6 +175,9 @@ map_js_cam_tilt:        {self.map_js_cam_tilt}
         if self.reverse_velocity:
             velocity *= -1
         msg.data = [velocity, steering, 0.0, 0.0, 0.0]
+        #
+        # I2C_node.py subscribed diese Message
+        # und ruft dort dann den callback: handle_write auf
         self.publisher.publish(msg) 
 
 
@@ -191,6 +239,8 @@ map_js_cam_tilt:        {self.map_js_cam_tilt}
             velocity = axes[self.js_velocity]
             steering = axes[self.js_steering]
             now = time.monotonic()
+            #
+            # Nur dann Daten versenden, wenn sich zwisch jetzt und letzter Übertragung etwas geändert hat
             if (now - self.last_i2c_time >= self.min_interval and
                     (velocity != self.last_velocity or steering != self.last_steering)):
                 self.publish_steering_velocity(steering, velocity)

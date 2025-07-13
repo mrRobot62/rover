@@ -281,35 +281,6 @@ class LEDNode(Node):
 
         self.get_logger().info('LEDNode gestartet')
 
-    def resolve_value(self, msg_value, default_value):
-        """
-        Entscheidet, ob der vom Publisher gesendete Wert (msg_value)
-        benutzt werden soll, oder ob der Default-Wert verwendet wird.
-
-        Die Logik:
-        - Für Zahlen (int, float): alles außer None wird verwendet, auch 0
-        - Für Listen/Tupel (z. B. color): wird verwendet, wenn nicht exakt [0,0,0]
-        - Für Strings: wird verwendet, wenn nicht leer
-        - Für None: default wird genommen
-        """
-        if msg_value is None:
-            return default_value
-
-        if isinstance(msg_value, (int, float)):
-            return msg_value
-
-        if isinstance(msg_value, (list, tuple)):
-            if msg_value == [0, 0, 0] or msg_value == (0, 0, 0):
-                return default_value
-            return msg_value
-
-        if isinstance(msg_value, str):
-            return msg_value if msg_value.strip() else default_value
-
-        # fallback für alles andere
-        return msg_value
-
-
     def validate_led_pattern(self, pattern_id: int) -> bool:
         """
         Prüft, ob pattern_id ein gültiger Wert der LEDPattern-Enum ist.
@@ -371,6 +342,7 @@ class LEDNode(Node):
         if pattern_id == 0:
             # color aus der Message übernehmen
             user_params["color"][:] = msg.color
+            user_params['callback'] = msg.callback if msg.callback != '' else user_params.get("callback")
 
         #
         # Wenn ein Attribut in der Message nicht gesetzt wird ist der Wert per default 0 oder 0.0 oder ''

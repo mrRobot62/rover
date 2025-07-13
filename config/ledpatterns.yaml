@@ -63,12 +63,13 @@ anchors:
 # ----------------------------------------------------------------------------------------
 0:
   <<: *defaults
-  name: "NONE"
-  color: [0, 0, 0]
-
+  name: "USER"
+  callback: 'fill'
+  
 1:
   <<: *defaults
   name: "LED OFF"
+  callback: 'off'
   color: [0, 0, 0]
 
 # ----------------------------------------------------------------------------------------
@@ -183,21 +184,21 @@ anchors:
 # Build-in Pattern: blink() callback
 # ----------------------------------------------------------------------------------------
 100:
-  <<: [*HAZARD, *defaults]
+  <<: [*HAZARD, *defaults_blink]
   name: "blink HAZARD"
-  color: [235, 170, 50]
+  color: [250,100,0]
   duration_on: 125
   duration_off: 125
 
 101:
-  <<: [*BLINK_LEFT, *defaults]
+  <<: [*BLINK_LEFT, *defaults_blink]
   name: "blink BLINK_LEFT"
   color: [235, 170, 50]
   duration_on: 125
   duration_off: 125
 
 102:
-  <<: [*BLINK_RIGHT, *defaults]
+  <<: [*BLINK_RIGHT, *defaults_blink]
   name: "blink BLINK_LEFT"
   color: [235, 170, 50]
   duration_on: 125

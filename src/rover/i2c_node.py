@@ -53,7 +53,8 @@ class I2CNode(LifecycleNode):
         parameters=[
             ('i2c_write', '/i2c/write'),
             ('i2c_read', '/i2c/read'),
-            ('timer_update', 0.5),
+            ('i2c_timer_update', 0.5),
+            ('i2c_timer_periodic_update', 15.0),
             ('i2c_bus_id', 1),
             ('i2c_esp_addr', 0x12),
             ('i2c_ads_addr', 0x48),
@@ -64,7 +65,8 @@ class I2CNode(LifecycleNode):
         #
         self.i2c_write = self.get_parameter('i2c_write').get_parameter_value().string_value
         self.i2c_read = self.get_parameter('i2c_read').get_parameter_value().string_value
-        self.i2c_timer_update = self.get_parameter('timer_update').get_parameter_value().double_value
+        self.i2c_timer_update = self.get_parameter('i2c_timer_update').get_parameter_value().double_value
+        self.i2c_timer_periodic_update = self.get_parameter('i2c_timer_periodic_update').get_parameter_value().double_value
         self.i2c_bus_id = self.get_parameter('i2c_bus_id').get_parameter_value().integer_value
         self.i2c_esp_addr = self.get_parameter('i2c_esp_addr').get_parameter_value().integer_value
         self.i2c_ads_addr = self.get_parameter('i2c_ads_addr').get_parameter_value().integer_value
@@ -81,14 +83,15 @@ class I2CNode(LifecycleNode):
         f"""
         I2CNode config:\n\
         --------------------------------
-        Topic WRITE:        {self.i2c_write}
-        Topic READ:         {self.i2c_read}
-        Timer update freq:  {self.i2c_timer_update}
-        I2C-BUS-ID:         {self.i2c_bus_id}
-        I2C-ESP32-ADDR:     {self.i2c_esp_addr}
-        I2C-ESP32-RAISE-ERR:{self.i2c_esp32_raise_onerror}
-        I2C-ADS-ADDR:       {self.i2c_ads_addr}
-        I2C-ADS-RAISE-ERR:  {self.i2c_ads_raise_onerror}
+        Topic WRITE:                {self.i2c_write}
+        Topic READ:                 {self.i2c_read}
+        i2c_timer_update:           {self.i2c_timer_update}
+        i2c_timer_periodic_update:  {self.i2c_timer_periodic_update}
+        I2C-BUS-ID:                 {self.i2c_bus_id}
+        I2C-ESP32-ADDR:             {self.i2c_esp_addr}
+        I2C-ESP32-RAISE-ERR:        {self.i2c_esp32_raise_onerror}
+        I2C-ADS-ADDR:               {self.i2c_ads_addr}
+        I2C-ADS-RAISE-ERR:          {self.i2c_ads_raise_onerror}
 
         """)
         self.get_logger().info(f"[{self.node_name}] Node im Status unconfigured")
@@ -107,10 +110,6 @@ class I2CNode(LifecycleNode):
             self.get_logger().info(f'Create Service {self.i2c_read}')
             self.create_service(I2CReadRequest, self.i2c_read, self.handle_read)
 
-            # Periodisches Lesen vom ESP32 oder ADS1115
-            self.get_logger().info(f'Create Timer {self.i2c_read}')
-            self.timer = self.create_timer(self.i2c_timer_update, self.periodic_read)
-
             # Bus-Instanz erhalten
             self.bus = SingletonI2CBus.getBus(self.i2c_bus_id)
             self.get_logger().info(f"I2C-Bus Instanz {self.bus}")
@@ -126,6 +125,7 @@ class I2CNode(LifecycleNode):
 
     def on_activate(self, state: State):
         self.get_logger().info(f'on_activate()')
+        self.periodic_timer = None
         try:
             self.get_logger().info(f'Ping to ESP32...()')
             self.esp_ready = SingletonI2CBus.pingSlave(self.i2c_bus_id, self.i2c_esp_addr)
@@ -146,6 +146,10 @@ class I2CNode(LifecycleNode):
                     self.get_logger().warn(f"ADS1115 nicht erreichbar mit {hex(self.i2c_ads_addr)}")
             else:
                 self.get_logger().info(f'ADS1115 erreichbar mit  {hex(self.i2c_ads_addr)}')
+            # Periodisches Lesen vom ESP32 oder ADS1115
+            self.get_logger().info(f'Create PeriodicTimer: {self.i2c_timer_periodic_update}sec')
+            self.periodic_timer = self.create_timer(self.i2c_timer_periodic_update, self.periodic_read)
+
 
         except Exception as e:
             self.get_logger().error(f'[{self.node_name}] Fehler in on_activate(): {e}')
@@ -191,7 +195,14 @@ class I2CNode(LifecycleNode):
             self.esp_driver.digitalWrite(msg.pins, msg.states)
             self.get_logger().debug(f"[{self.node_name}] digital_write => {msg.pins}::{msg.states}")
         elif msg.command == CommandID.SERVO_WRITE:
-            pass
+            #
+            # beachten: die parameter reverse_velocity und reverse_steeoring
+            # wurden schon vom driver_controller_node in den beide data-werten
+            # verrechnet.
+            self.rover_driver.set_steeringAndVelocity(
+                steering=msg.data[0],
+                velocity=msg.data[1]
+            )
         else:
             self.get_logger().warn(f"Unbekannter Befehl: {msg.command}")
 
@@ -207,8 +218,11 @@ class I2CNode(LifecycleNode):
     def periodic_read(self):
         """
         Liest regelmäßig Werte von angeschlossenen Geräten.
+
+        202507: ADS1115 (Spannung & Strom)
         """
-        # Hier kann z. B. ein ADC gelesen und auf Topic publiziert werden
+        self.get_logger().info(f"[periodic_read] read I2C Slave....")
+        self.
         pass
 
 

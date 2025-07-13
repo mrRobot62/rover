@@ -24,7 +24,19 @@ from rclpy.executors import MultiThreadedExecutor
 import random
 
 class SensorNode(LifecycleNode):
+    """
+    Verwaltet Sensoren, verarbeitet Sensordaten selber oder leitet sie weiter in Topics
 
+    Publish-Messagess: (OUT)
+    - /battery : Batterie Daten we
+    - /led : LEDMessage zur Anzeige bestimmter Status Begebenheiten
+            (z.B Batterie-Status, ....)
+    
+    SUBSCRIBE-Messages: (IN)    
+    - /scan Lidar Topic: Lidar Entfernungsdaten
+    - /imu Gyro/accelerometer: Daten. Leitet diese zusätzlich auch weiter
+
+    """
     battery_levels = [
         (100, LEDPattern.BATTERY_100.value),
         (90, LEDPattern.BATTERY_90.value),

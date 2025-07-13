@@ -108,7 +108,6 @@ class WS2812SPI:
         self.stop()
         ledmask = self.ledmask if ledmask is None else ledmask
         color = self.apply_brightness(color)
-        print(f"ws2812.BLINK color={color} mask={bin(ledmask)} DefaultMask: {hex(self.ledmask)}")
 
         def _blink_loop():
             start = time.time()
@@ -271,7 +270,6 @@ class WS2812SPI:
         self.driver.brightness=brightness
 
     def clear(self):
-        print (f"ws2812.clear((0,0,0))")
         self.fill()
 
     #
@@ -285,7 +283,7 @@ class WS2812SPI:
         Stoppt ggf. laufende Blink- oder Pattern-Threads.
         """
         self._stop_event.set()
-        for thread in [self._fill_thread, self._blink_thread, self._run_thread]:
+        for thread in [self._fill_thread, self._blink_thread, self._run_thread, self._circle_thread]:
             if thread and thread.is_alive():
                 thread.join()
         self._stop_event.clear()

@@ -50,30 +50,32 @@ class I2CNode(LifecycleNode):
         super().__init__('i2c_node')
         self.get_logger().info("I2C LifecycleNode instantiated")
 
-        bus1 = Utilities.get_common_topic('i2c_bus1', 1, logger=self.get_logger())
-        bus2 = Utilities.get_common_topic('i2c_bus2', 2, logger=self.get_logger())
-        i2c_esp_adr = Utilities.get_common_topic('i2c_esp_adr', 0x12, logger=self.get_logger())
-        i2c_ads_adr = Utilities.get_common_topic('i2c_ads_adr', 0x48, logger=self.get_logger())
-
-
-        self.declare_parameter('topic_led', topic)
+        ct_bus1 = Utilities.get_common_topic('i2c_bus1', 1, logger=self.get_logger())
+        ct_bus2 = Utilities.get_common_topic('i2c_bus2', 2, logger=self.get_logger())
+        ct_i2c_esp_adr = Utilities.get_common_topic('i2c_esp_adr', 0x12, logger=self.get_logger())
+        ct_i2c_ads_adr = Utilities.get_common_topic('i2c_ads_adr', 0x48, logger=self.get_logger())
+        ct_t_write = Utilities.get_common_topic('i2c_write_topic','/i2c/write', logger=self.get_logger())
+        ct_t_read = Utilities.get_common_topic('i2c_read_topic','/i2c/read', logger=self.get_logger())
+        ct_t_ads_raw = Utilities.get_common_topic('topic_battery_raw','/battery/ads_raw', logger=self.get_logger())
+        ct_srv_esp = Utilities.get_common_topic('i2c_esp_command_srv','/i2c/esp32_command', logger=self.get_logger())
+        ct_srv_read = Utilities.get_common_topic('i2c_read_request_srv','/i2c/read_request', logger=self.get_logger())
 
         # Parameter auslesen
         self.declare_parameters(
         namespace='',
         parameters=[
             # Common config
-            ('i2c_bus_id', bus1),
-            ('i2c_bus_id2', bus2),
-            ('i2c_esp_addr',i2c_esp_adr),
-            ('i2c_ads_addr', i2c_ads_adr),
+            ('i2c_bus_id', ct_bus1),
+            ('i2c_bus_id2', ct_bus2),
+            ('i2c_esp_addr',ct_i2c_esp_adr),
+            ('i2c_ads_addr', ct_i2c_ads_adr),
+            ('i2c_write_topic', ct_t_write),
+            ('i2c_read_topic', ct_t_read),
+            ('i2c_esp_command_srv', ct_srv_esp),
+            ('i2c_ads_raw_topic', ct_t_ads_raw),
+            ('i2c_read_request_srv', ct_srv_read),
  
             # I2C_node config
-            ('i2c_write_topic', '/i2c/write'),
-            ('i2c_read_topic', '/i2c/read'),
-            ('i2c_esp_command_srv', '/i2c/esp32_command'),
-            ('i2c_read_request_srv', '/i2c/read_request'),
-            ('i2c_ads_raw_topic', '/battery/ads_raw'),
             ('i2c_timer_update', 0.5),
             ('ads1115_sample_rate_hz', 1),    # 1hz = 1xsek
             ('acs712_zero_offset', 2.5),
@@ -113,21 +115,21 @@ class I2CNode(LifecycleNode):
         self.get_logger().info(
         f"""
         I2CNode config:\n\
-        --------------------------------
-        COMMON
+        ---------------------------------------------------
+        COMMON --------------------------------------------
         TOPIC WRITE:                {self.i2c_write_topic}
         TOPIC READ:                 {self.i2c_read_topic}
         TOPIC BatteryRaw:           {self.i2c_ads_raw_topic}
-
-        I2C-NODE
         SERIVCE ESP32:              {self.i2c_esp_command_srv}
         SERIVCE REQUEST_RESPONSE:   {self.i2c_request_request_srv}
-        i2c_timer_update:           {self.i2c_timer_update}
         I2C-BUS-ID1:                {self.i2c_bus_id}
         I2C-BUS-ID2:                {self.i2c_bus_id2}
-        I2C-ESP32-ADDR:             {self.i2c_esp_addr}
+        I2C-ESP32-ADDR:             {self.i2c_esp_addr} / {hex(self.i2c_esp_addr)}
+        I2C-ADS-ADDR:               {self.i2c_ads_addr} / {hex(self.i2c_ads_addr)}
+
+        I2C-NODE -----------------------------------------
+        i2c_timer_update:           {self.i2c_timer_update}
         I2C-ESP32-RAISE-ERR:        {self.i2c_esp32_raise_onerror}
-        I2C-ADS-ADDR:               {self.i2c_ads_addr}
         I2C-ADS-RAISE-ERR:          {self.i2c_ads_raise_onerror}
         I2C-ADS-SAMPLE-RATE-HZ      {self.ads1115_sample_rate_hz}
         """)

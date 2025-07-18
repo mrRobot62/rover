@@ -12,6 +12,7 @@ from rover_interfaces.srv import I2CReadRequest
 from .control.led_pattern import LEDPattern
 from .control.ESP32Client import ESP32Client
 from .control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS
+from .control.utilities import Utilities
 
 class ESP32_PORTS(Enum):
     LED1=18
@@ -57,10 +58,14 @@ class DriverControllerNode(Node):
         super().__init__('driver_controller_node')
         self.node_name = self.__class__.__name__
         # Parameter auslesen
+
+        ct_tled = Utilities.get_common_topic('topic_led', 1, logger=self.get_logger())
+
         self.declare_parameters(
         namespace='',
         parameters=[
             ('cmd_vel_topic', '/joy'),
+            ('topic_led', ct_tled),
             ('reverse_steering', True),
             ('reverse_velocity', False),
             ('map_js_steering', 0),
@@ -70,6 +75,7 @@ class DriverControllerNode(Node):
         ])
 
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
+        self.topic_led = self.get_parameter('topic_led').get_parameter_value().string_value
         self.reverse_steering = self.get_parameter('reverse_steering').get_parameter_value().bool_value
         self.reverse_velocity = self.get_parameter('reverse_velocity').get_parameter_value().bool_value
         self.map_js_steering = self.get_parameter('map_js_steering').get_parameter_value().integer_value
@@ -82,6 +88,7 @@ class DriverControllerNode(Node):
             DriverControllerNode(Node) config:\n\
             --------------------------------
             cmd_vel_topic:          {self.cmd_vel_topic}
+            cmd_vel_topic:          {self.topic_led}
             reverse_steering:       {self.reverse_steering}
             reverse_velocity:       {self.reverse_velocity}
             map_js_steering:        {self.map_js_steering}

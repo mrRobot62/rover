@@ -1,14 +1,12 @@
 
 i2c_node:
   ros__parameters:
-    # Möglichkeit 4
-    i2c_read_request_srv: "/i2c/read_request"
 
     i2c_timer_update: 0.5
-    i2c_bus_id: 1
-    i2c_esp32_addr: 0x12
+    #i2c_bus_id: 1
+    #i2c_esp32_addr: 0x12
     i2c_esp32_raise_onerror: True
-    i2c_ads_addr: 0x48
+    #i2c_ads_addr: 0x48
     i2c_ads_raise_onerror: False
 
     #

@@ -90,52 +90,5 @@ class ADS1115Driver:
         v = self.read_voltage(channel)
         factor = voltMaxIn / voltMaxOut
         scaled = v * factor
-        self.logger.info(f"ADS1115: scaled_voltage channel {channel}: {scaled:.2f} V (raw={v:.3f} V)")
+        self.logger.debug(f"ADS1115: scaled_voltage channel {channel}: {scaled:.2f} V (raw={v:.3f} V)")
         return scaled
-
-
-
-
-# class ADS1115Driver:
-#     POINTER_CONVERT = 0x00
-#     POINTER_CONFIG = 0x01
-
-#     ADS_GAINS = {
-#         0 : [0x0000, 6.144],  # ±6.144 V
-#         1 : [0x0200, 4.096],  # ±4.096 V
-#     }
-
-#     def __init__(self, bus, logger, slave_address=0x48, gain=0):
-#         self.logger = logger
-#         self.bus = bus
-#         self.addr = slave_address
-#         self.logger.info("ADS1115Driver init")
-#         self.CONFIG_GAIN = self.ADS_GAINS.get(gain, self.ADS_GAINS[0])[0]
-#         self.CONFIG_GAIN_FACTOR = self.ADS_GAINS.get(gain, self.ADS_GAINS[0])[1]
-
-#     def read_voltage(self, channel: int = 0) -> float:
-#         raw = self.read_channel(channel)
-#         return (raw * self.CONFIG_GAIN_FACTOR) / 32768.0
-
-#     def scaled_voltage(self, channel: int, voltMaxIn=25.0, voltMaxOut=5.0):
-#         sensor_voltage = self.read_voltage(channel=channel) #* voltMaxOut
-#         self.logger.info(f"ADS1115Driver scaled_voltage: {sensor_voltage}V")
-#         return sensor_voltage
-
-#     def read_channel(self, channel: int) -> int:
-#         if not 0 <= channel <= 3:
-#             raise ValueError("Channel must be 0–3")
-
-#         mux = 0x4000 | (channel << 12)
-#         config = (
-#             0x8000 | mux | self.CONFIG_GAIN |
-#             0x0100 | 0x0080 | 0x0003
-#         )
-#         config_bytes = [(config >> 8) & 0xFF, config & 0xFF]
-
-#         self.bus.write_i2c_block_data(self.addr, self.POINTER_CONFIG, config_bytes)
-#         time.sleep(0.001)
-
-#         result = self.bus.read_i2c_block_data(self.addr, self.POINTER_CONVERT, 2)
-#         value = (result[0] << 8) | result[1]
-#         return value - 0x10000 if value > 0x7FFF else value

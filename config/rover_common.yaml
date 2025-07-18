@@ -15,6 +15,9 @@ common_topics:
     # ROS2 Service zur Kommunikation mit dem ESP32
     # Möglichkeit 3
     i2c_esp_command_srv: "/i2c/esp32_command"
+    # Möglichkeit 4
+    # allgemeiner read/request
+    i2c_read_request_srv: "/i2c/read_request"
 
     # I2C-Stuff
     i2c_bus1: 1

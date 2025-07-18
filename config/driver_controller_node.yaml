@@ -1,0 +1,17 @@
+# ------------------------------------------------------
+# Gamepad-Controller
+# ------------------------------------------------------
+driver_controller_node:
+  ros__parameters:
+    cmd_vel_topic: "/joy"
+    log_level: INFO
+    reverse_steering: false
+    reverse_velocity: false
+    # Joystick mappings
+    # LJ_LR = 0, LJ_UD = 1
+    # RJ_LR = 2, RJ_UD = 3
+    # PAD_LR = 4, PAD_UD = 5
+    map_js_steering: 0     # LJ_LR (Wert aus ENUM JOYSTICKS)
+    map_js_velocity: 1     # LJ_UD
+    map_js_cam_turn: 2     # RJ_LR
+    map_js_cam_tilt: 3     # RJ_UD

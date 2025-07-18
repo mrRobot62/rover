@@ -1,13 +1,24 @@
-ros__parameters:
-  # Allgemeine topics die von allen Nodes genutzt werden können
-  topic_led: '/led'
-  topic_battery: '/battery'
-  topic_imu: '/imu'
-  
+common_topics:
+  ros__parameters:
+    # Allgemeine topics die von allen Nodes genutzt werden können
+    topic_led: '/led'
+    topic_battery: '/battery'
+    topic_battery_raw: '/battery/ads_raw'
+    topic_imu: '/imu'
+    
+    # subscribe einen Befehl der an einen Slave gesendet wird (Write)
+    # Möglichkeit 1
+    i2c_write_topic: "/i2c/write"
+    # publish einen Value der von einen I2C Slave empfangen wurde
+    # Möglichkeit 2
+    i2c_read_topic: "/i2c/read"
+    # ROS2 Service zur Kommunikation mit dem ESP32
+    # Möglichkeit 3
+    i2c_esp_command_srv: "/i2c/esp32_command"
 
-  # I2C-Stuff
-  i2c_bus1: 1
-  i2c_bus2: 2
-  # Alle I2C Slaves werden in der common.yaml definiert
-  i2c_esp_adr: 0x12
-  i2c_ads_adr: 0x48
+    # I2C-Stuff
+    i2c_bus1: 1
+    i2c_bus2: 2
+    # Alle I2C Slaves werden in der common.yaml definiert
+    i2c_esp_adr: 0x12
+    i2c_ads_adr: 0x48

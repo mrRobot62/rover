@@ -1,0 +1,25 @@
+
+i2c_node:
+  ros__parameters:
+    # Möglichkeit 4
+    i2c_read_request_srv: "/i2c/read_request"
+
+    i2c_timer_update: 0.5
+    i2c_bus_id: 1
+    i2c_esp32_addr: 0x12
+    i2c_esp32_raise_onerror: True
+    i2c_ads_addr: 0x48
+    i2c_ads_raise_onerror: False
+
+    #
+    # ADS1115 wird als 4x ADC IN I2C Sensor genutzt
+    ads1115_gain: 0               # entspricht einem Messebereich bis +/- 6.144V (also passend für 0-5V)
+    ads1115_sample_rate_hz: 5     # 5Hz, 200ms
+
+    #
+    # ACS712 Current-Sensor
+    # 5A Version
+    acs712_vdd: 5.0             # 5V oder 3.3
+    acs712_sensitivity: 0.185   # 5A = 0.185, 20A = 0.100, 30A=0.066
+    acs712_zero_offset: 2.415   # im Idealfall 2.5V bei 0A. Der genutzte zeigt aber ca. 2.415V an
+    acs712_on_channel: 1        # channel am ADS1115

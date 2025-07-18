@@ -4,7 +4,8 @@
 sensor_node:
   ros__parameters:
     #
-    # Battery-Sensor liegt am I2C-Bus 1
+    # Battery-Sensor liegt am I2C-Bus 
+    battery_sample_refresh_hz: 0.1  # Angabe in Herz 0.1hz = alle 10sek
     battery_voltage_channel: 0
     battery_current_channel: 1
     battery_sensor_active: true
@@ -22,15 +23,7 @@ sensor_node:
     voltage_max_in: 25.0  # Maximaler Spannungseingang 25.0
     voltage_max_out: 5.0  # ADC Ausgang 0-5.0V (in 25.0V = out 5.0V)
 
-    #
-    # ADS1115 wird als 4x ADC IN I2C Sensor genutzt
-    ads1115_gain: 0       # entspricht einem Messebereich bis +/- 6.144V (also passend für 0-5V)
-
-    #
-    # ACS712 Current-Sensor
-    # 5A Version
-    acs712_type: 5          # 5A, 20A, 30A, aus dieser Angabe wird der Skalierungs-Faktor abgeleitet
-    acs712_vdd: 5.0             # 5V oder 3.3
     
     # IMU-Sensor liegt am I2C-Bus 1
     imu_sensor_active: false
+    imu_sample_refresh_hz: 100  # Angabe in Herz 100hz

@@ -34,20 +34,6 @@ vision_node:
   ros__parameters:
     vison_topic: "/vision/result"
 
-i2c_node:
-  ros__parameters:
-    # subscribe einen Befehl der an einen Slave gesendet wird (Write)
-    i2c_write_topic: "/i2c/write"
-    # publish einen Value der von einen I2C Slave empfangen wurde
-    i2c_read_topic: "/i2c/read"
-    i2c_timer_update: 0.5
-    i2c_timer_periodic_update: 10.0
-    i2c_bus_id: 1
-    i2c_esp32_addr: 0x12
-    i2c_esp32_raise_onerror: True
-    i2c_ads_addr: 0x48
-    i2c_ads_raise_onerror: False
-
 # ------------------------------------------------------
 # der verwendete Lidar soll generisch eingebunden werden
 # Default lidar_model:=ydlidar
@@ -74,20 +60,3 @@ xv11:
     lidar_topic: "/scan"
     scan_rate_hz: 5
 
-# ------------------------------------------------------
-# Gamepad-Controller
-# ------------------------------------------------------
-driver_controller_node:
-  ros__parameters:
-    cmd_vel_topic: "/joy"
-    log_level: INFO
-    reverse_steering: false
-    reverse_velocity: false
-    # Joystick mappings
-    # LJ_LR = 0, LJ_UD = 1
-    # RJ_LR = 2, RJ_UD = 3
-    # PAD_LR = 4, PAD_UD = 5
-    map_js_steering: 0     # LJ_LR (Wert aus ENUM JOYSTICKS)
-    map_js_velocity: 1     # LJ_UD
-    map_js_cam_turn: 2     # RJ_LR
-    map_js_cam_tilt: 3     # RJ_UD

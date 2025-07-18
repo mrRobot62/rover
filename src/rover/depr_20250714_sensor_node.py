@@ -16,7 +16,6 @@ from rclpy.lifecycle import State
 from .sensors.lidar_sensor import LidarSensor
 from .sensors.depr_battery_sensor import BatterySensor, BatteryStatus, PowerStatus
 from .control.led_pattern import LEDPattern
-from .control.BatteryClient import BatteryClient
 
 from rover_interfaces.msg import Battery, LEDMessage
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -39,34 +38,19 @@ class SensorNode(LifecycleNode):
     - /imu Gyro/accelerometer: Daten. Leitet diese zusätzlich auch weiter
 
     """
-    # battery_levels = [
-    #     (100, LEDPattern.BATTERY_100.value),
-    #     (90, LEDPattern.BATTERY_90.value),
-    #     (80, LEDPattern.BATTERY_80.value),
-    #     (70, LEDPattern.BATTERY_70.value),
-    #     (60, LEDPattern.BATTERY_60.value),
-    #     (50, LEDPattern.BATTERY_50.value),
-    #     (40, LEDPattern.BATTERY_40.value),
-    #     (30, LEDPattern.BATTERY_30.value),
-    #     (20, LEDPattern.BATTERY_20.value),
-    #     (10, LEDPattern.BATTERY_10.value),
-    #     (0,  LEDPattern.BATTERY_0.value),
-    # ]
-
-    battery_levels= {
-        100:LEDPattern.BATTERY_100.value,
-        90:LEDPattern.BATTERY_90.value,
-        80:LEDPattern.BATTERY_80.value,
-        70:LEDPattern.BATTERY_70.value,
-        60:LEDPattern.BATTERY_60.value,
-        50:LEDPattern.BATTERY_50.value,
-        40:LEDPattern.BATTERY_40.value,
-        30:LEDPattern.BATTERY_30.value,
-        20:LEDPattern.BATTERY_20.value,
-        10:LEDPattern.BATTERY_10.value,
-        0:LEDPattern.BATTERY_0.value,
-    }
-
+    battery_levels = [
+        (100, LEDPattern.BATTERY_100.value),
+        (90, LEDPattern.BATTERY_90.value),
+        (80, LEDPattern.BATTERY_80.value),
+        (70, LEDPattern.BATTERY_70.value),
+        (60, LEDPattern.BATTERY_60.value),
+        (50, LEDPattern.BATTERY_50.value),
+        (40, LEDPattern.BATTERY_40.value),
+        (30, LEDPattern.BATTERY_30.value),
+        (20, LEDPattern.BATTERY_20.value),
+        (10, LEDPattern.BATTERY_10.value),
+        (0,  LEDPattern.BATTERY_0.value),
+    ]
 
     def __init__(self):
         self.node_name = self.__class__.__name__
@@ -99,18 +83,16 @@ class SensorNode(LifecycleNode):
                     # Common Parameter
                     ('topic_led','/led'),
                     ('topic_battery','/battery'),
-                    ('topic_ads_raw','/battery/ads_raw'),       # ADS1115, Rückgabe der Channels 0-3
                     ('topic_imu','/imu'),
                     ('i2c_bus1',1),
                     ('i2c_esp_adr',0x12),
                     ('i2c_ads_adr', 0x48),
 
                     # Node Parameter
-                    ('battery_sample_refresh_hz', 0.1),
                     ('battery_sensor_active', True),
                     ('battery_critical', 1.0),
-                    ('battery_low', 11.4),
-                    ('battery_full', 14.6),
+                    ('battery_low', 1.0),
+                    ('battery_full', 1.0),
                     ('battery_voltage_channel', 0),
                     ('battery_current_channel', 1),
                     ('battery_i2c_bus_id', 1),
@@ -120,9 +102,7 @@ class SensorNode(LifecycleNode):
                     ('acs712_type', 5),
                     ('acs712_vdd', 5.0),
                     ('imu_sensor_active', False),
-                    ('imu_sample_refresh_hz', 100.0),
                 ])
-
 
             # Common Parameter
             self.i2c_bus1 = self.get_parameter('i2c_bus1').get_parameter_value().integer_value
@@ -131,10 +111,8 @@ class SensorNode(LifecycleNode):
             self.topic_battery = self.get_parameter('topic_battery').get_parameter_value().string_value
             self.topic_led = self.get_parameter('topic_led').get_parameter_value().string_value
             self.topic_imu = self.get_parameter('topic_imu').get_parameter_value().string_value
-            self.topic_ads_raw = self.get_parameter('topic_ads_raw').get_parameter_value().string_value
 
             # Node Parameter
-            self.battery_sample_refresh_hz = self.get_parameter('battery_sample_refresh_hz').get_parameter_value().double_value
             self.battery_sensor_active = self.get_parameter('battery_sensor_active').get_parameter_value().bool_value
             self.battery_critical = self.get_parameter('battery_critical').get_parameter_value().double_value
             self.battery_low = self.get_parameter('battery_low').get_parameter_value().double_value
@@ -149,7 +127,34 @@ class SensorNode(LifecycleNode):
             self.acs712_vdd = self.get_parameter('acs712_vdd').get_parameter_value().double_value
 
             self.imu_sensor_active = self.get_parameter('imu_sensor_active').get_parameter_value().bool_value
-            self.imu_sample_refresh_hz = self.get_parameter('imu_sample_refresh_hz').get_parameter_value().double_value
+            # Sensoren installieren
+            try:
+                if self.battery_sensor_active:
+                    self.batterySensor = BatterySensor(
+                        logger=self.get_logger(),
+                        i2c_bus_id=self.i2c_bus1,
+                        batMin=self.battery_low,
+                        batMax=self.battery_full,
+                        voltMaxIn=self.voltage_max_in,
+                        voltMaxOut=self.voltage_max_out,
+                        batVCh=self.battery_voltage_channel,
+                        batCCh=self.battery_current_channel,
+                        acs712_type=self.acs712_type,
+                        acs712_vdd=self.acs712_vdd,
+                        i2c_slave_address=self.i2c_ads_adr,
+                        gain=self.ads1115_gain
+                    )
+                    self.get_logger().warn(f"[self.node_name] => BatterySensor ready")
+                else:
+                    self.get_logger().warn(f"BatterySensor deaktiviert")
+                    self.batterySensor = None
+            except Exception as err:
+                self.get_logger().error(f"BatterySensor konnte nicht initialisiert werden: {err}")
+                self.batterySensor = None
+                import traceback
+                self.get_logger().error(traceback.format_exc())
+                return TransitionCallbackReturn.FAILURE
+
             try:
                 if self.imu_sensor_active:
                     self.get_logger().warn(f"IMU aktuell nicht implementiert")
@@ -163,9 +168,6 @@ class SensorNode(LifecycleNode):
                 self.imuSensor = None
                 return TransitionCallbackReturn.FAILURE
                   
-
-            self.battery_sample_refresh_rate = 1 / self.battery_sample_refresh_hz
-            self.imu_sample_refresh_rate = 1 / self.imu_sample_refresh_hz
             #
             # PUBLISHER aktivieren
 
@@ -176,32 +178,25 @@ class SensorNode(LifecycleNode):
             self.battery_publisher = self.create_lifecycle_publisher(Battery, self.topic_battery, 10)
             self.imu_publisher = self.create_lifecycle_publisher(Imu, self.topic_imu, 10)
 
-
-
             self.get_logger().info(
             f"""
             SensorNode config:\n\
-            Topics
+            Publish-Topics
             --------------------------------------------
-            PUBLISH TOPIC LED:                  {self.topic_led}
-            PUBLISH TOPIC BATTERY:              {self.topic_battery}
-            SUBSCRIBE TOPIC BATTERY:            {self.topic_ads_raw}
-            
+            LED:                                {self.topic_led}
+            BATTERY:                            {self.topic_battery}
+            IMU:                                {self.topic_imu}
             --------------------------------------------
             BATTERY-SENSOR
-                battery_sample_refresh_hz:      {self.battery_sample_refresh_hz}hz
-                battery_sample_refresh_rate:    {self.battery_sample_refresh_rate}s
                 battery_sensor_active:          {self.battery_sensor_active}
-                battery_critical:               {self.battery_critical}V
-                battery_low:                    {self.battery_low}V
-                battery_full:                   {self.battery_full}V
+                battery_critical:               {self.battery_critical}
+                battery_low:                    {self.battery_low}
+                battery_full:                   {self.battery_full}
                 battery_voltage_channel:        {self.battery_voltage_channel}
+                battery_current_channel:        {self.battery_current_channel}
 
-            --------------------------------------------
             IMU-Sensor
                 battery_sensor_active:          {self.imu_sensor_active}
-                imu_sample_refresh_hz:          {self.imu_sample_refresh_hz}hz
-                imu_sample_refresh_rate:        {self.imu_sample_refresh_rate}s
             """)
 
             self.get_logger().info('on_configure() abgeschlossen')
@@ -217,35 +212,15 @@ class SensorNode(LifecycleNode):
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('on_activate()')
 
-        #
-        # BatteryClient ist das Bindeglied zwischen dem SensorNode und 
-        # dem I2CNode und liefert letztendlich voltage und level zurück
-        # weiterhin subscribed er das Topic BatteryRow /battery/ads_raw
-        self.bat_voltage_changed = False
-        self.bat_voltage = 0.0
-        self.bat_level = 0
-        self.batClient = BatteryClient(
-            self.get_logger(),
-            node=self,
-            topic=self.topic_ads_raw,
-            batMin=self.battery_low,
-            batMax=self.battery_full,
-            callback=self._callback_battery_client
-        )
-        self.bat_voltage_changed = True
-        self.get_logger().info(f"BatteryClient on {self.batClient}")
-
-        # Battery Publisher  aktivieren
+        # Publisher aktivieren
         self.battery_publisher.on_activate(state)
-        # BatteryPublisher refresh 
-        self.timer = self.create_timer(self.battery_sample_refresh_rate, self.publish_battery_state)
-        self.get_logger().info(f"battery_publisher aktiviert - Timer:{self.battery_sample_refresh_rate}s")
-
-        #
-        # IMU Publisher aktivieren 
+        self.get_logger().info(f"battery_publisher aktiviert")
         self.imu_publisher.on_activate(state)
-        self.timer2 = self.create_timer(self.imu_sample_refresh_rate, self.publish_imu_state)
-        self.get_logger().info(f"imu_publisher aktiviert - Timer:{self.imu_sample_refresh_rate}s")
+        self.get_logger().info(f"imu_publisher aktiviert")
+
+        # Timer starten
+        self.timer = self.create_timer(10.0, self.publish_battery_state)
+        self.timer2 = self.create_timer(2.0, self.publish_imu_state)
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -301,48 +276,66 @@ class SensorNode(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
 
-    def _callback_battery_client(self, voltage: float, level: int, current:float = 0.0):
-        """ 
-            wird als callback vom BatteryClient verwendet. Ist lediglich für die
-            Persistierung der Spannung im SensorNode notwendig.
-            Hintergrund ist der Asynchrone Aufruf und die Subscription des BatteryClient
-            des Topics für die Roh-Daten des ADS1115
-
-        """
-        self.bat_voltage = voltage
-        self.bat_level = int(level)
-        self.bat_current = current
-        #self.get_logger().info(f"_callback_battery_client({self.bat_voltage}, {self.bat_level})")
+    def __get_battery_pattern(self, percentage: int) -> int:
+        try:
+            for threshold, level in self.battery_levels:
+                if percentage >= threshold:
+                    return level
+            return LEDPattern.BATTERY_0.value
+        except Exception:
+            self.get_logger().warn("Pattern nicht definiert bezogen auf Level {percentage}")
 
     def publish_battery_state(self):
-        # publish_battery_state ist timer gesteuert und wird alle x-Sekunden aufgerufen. Siehe self.timer = self.create_timer(10.0, self.publish_battery_state)
-        # Um unnötige Publishs zu vermeiden wird ein tatsächlicher publish nur dann durchgeführt, wenn sich tatsächlich eine Änderung ergeben hat        
-        batMsg = Battery()
-        if self.battery_sensor_active:
-            batMsg.battery_level = self.bat_level
-            batMsg.battery_voltage = self.bat_voltage
-            batMsg.battery_current = 0.0
-        else:
-            self.get_logger().warn('BatterySensor nicht verfügbar ')
-            batMsg.battery_current = 0.0
-            batMsg.battery_voltage = 0.0
-            batMsg.battery_level = 100
         try:
-            self.battery_publisher.publish(batMsg)
-            self.get_logger().info(f"battery_publisher: {batMsg}")
-        except Exception as e:
-            self.get_logger().warn(f'Konnte Batteriestatus nicht veröffentlichen: {e}')
+            if self.batterySensor is not None:
+                voltage = round(self.batterySensor.scaled_voltage(),2)
+                current = round(self.batterySensor.read_current(),2)
+                raw_v = round(self.batterySensor.read_voltage(),2)
+                level = self.batterySensor.battery_level(voltage)       # die aktuelle Messung wird genutzt
+                self.get_logger().info(f'(1) Battery State => ({level}%) | {voltage:.2f}V | {current:.2f}A')
 
+                batStatus = BatteryStatus(voltage=voltage, level=level)
+                pwrStatus = PowerStatus(current)
 
-        try:
+                batMsg = Battery()
+                batMsg.battery_voltage = batStatus.voltage
+                batMsg.battery_level = batStatus.level
+                batMsg.battery_current = pwrStatus.current
+
+                self.get_logger().info(f'Battery State => ({batMsg.battery_level}%) | {batMsg.battery_voltage:.2f}V | {batMsg.battery_current:.2f}A')
+            else:
+                self.get_logger().warn('BatterySensor nicht verfügbar ')
+                batMsg = Battery()
+                batMsg.battery_current = 0.0 # aktuell nicht genutzt
+                batMsg.battery_voltage = 0.0
+                batMsg.battery_level = 100
+
+            # nur zum Testen
+            #level = random.randrange(0,100,10)
+
+            #
+            # LED Message vorbereiten um den Batterie-Status darzustellen
             ledMsg = LEDMessage()
+            level = 30
             ledMsg.ledtype = 'WS2812'
-            ledMsg.pattern = self.battery_levels.get(batMsg.battery_level,LEDPattern.BATTERY_0.value)
+            #
+            # Battery-Level auf ein LEDPattern mappen (z.B 90% => LEDPattern.BATTERY_90 mit value 62)
+            ledMsg.pattern = self.__get_battery_pattern(level)
+            self.get_logger().info(f"Level '{level} => Pattern : {ledMsg.pattern}'")
+            #
+            # und im topic veröffentlichen
+            #self.led_publisher.publish(ledMsg)
+            #self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")
 
-            self.led_publisher.publish(ledMsg)            
-            self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")            
+
         except Exception as e:
             self.get_logger().error(f'Fehler beim Lesen des Batteriesensors: {e}')
+        
+        # Publish direkt in topic
+        try:
+            self.battery_publisher.publish(batMsg)
+        except Exception as e:
+            self.get_logger().warn(f'Konnte Batteriestatus nicht veröffentlichen: {e}')
 
 
     def publish_imu_state(self):

@@ -29,8 +29,10 @@ def generate_launch_description():
     rviz_config_file = os.path.join(share_dir, 'config/rviz', 'rover.rviz')
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
     params_file = os.path.join(share_dir, 'config', 'rover.yaml')
+    params_i2c_node = os.path.join(share_dir, 'config', 'i2c_node.yaml')
     params_sensor_node = os.path.join(share_dir, 'config', 'sensor_node.yaml')
-    params_common_file = os.path.join(share_dir, 'config', 'rover_common.yaml')
+    params_driver_controller_node = os.path.join(share_dir, 'config', 'driver_controller_node.yaml')
+    #params_common_file = os.path.join(share_dir, 'config', 'rover_common.yaml')
 
 
     # Liste der Lifecycle-Nodes (name, executable)
@@ -205,7 +207,7 @@ def generate_launch_description():
                 executable='driver_controller_node',
                 name='driver_controller_node',
                 output='screen',
-                parameters=[params_file]
+                parameters=[params_driver_controller_node]
             )
         ]
 
@@ -247,7 +249,7 @@ def generate_launch_description():
             name='sensor_node',
             output='screen',
             namespace='/',
-            parameters=[params_file, params_sensor_node]
+            parameters=[params_sensor_node]
         ),
         LifecycleNode(
             package='rover',
@@ -271,7 +273,7 @@ def generate_launch_description():
             name='i2c_node',
             output='screen',
             namespace='/',
-            parameters=[params_file]
+            parameters=[params_i2c_node]
         ),
     ])
 

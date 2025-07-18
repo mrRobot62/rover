@@ -1,5 +1,5 @@
 #from src.rover.hardware.i2c_driver import ESP32Driver, ServoDriver, SERVOCOMMANDS, ESP32COMMANDS
-from .i2c_driver import ESP32RawDriver, ServoDriver, CommandID, SubCommandID, dataModulo
+from .depr_i2c_driver import ESP32RawDriver, ServoDriver, CommandID, SubCommandID, dataModulo
 from enum import Enum
 from typing import List
 

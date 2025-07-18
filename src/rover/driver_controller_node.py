@@ -5,12 +5,13 @@ from sensor_msgs.msg import Joy
 from enum import Enum
 import time  # am Anfang ergänzen
 from rclpy.parameter import Parameter
-from .hardware.rover_driver import RoverDriver
+#from .hardware.rover_driver import RoverDriver
 from rover_interfaces.msg import I2CWrite
 from rover_interfaces.msg import LEDMessage
 from rover_interfaces.srv import I2CReadRequest
 from .control.led_pattern import LEDPattern
-
+from .control.ESP32Client import ESP32Client
+from .control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS
 
 class ESP32_PORTS(Enum):
     LED1=18
@@ -117,6 +118,9 @@ class DriverControllerNode(Node):
         self.last_i2c_time = time.monotonic()
         self.min_interval = 0.05
 
+        self.esp32client = ESP32Client(self, '/i2c/esp32_command')
+        self.get_logger().info('ESP32Client Objekt erhalten')
+
         self.get_logger().info('DriverControllerNode gestartet.')
 
     def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
@@ -133,53 +137,6 @@ class DriverControllerNode(Node):
         msg.ledmask = ledmask
         self.led_pub.publish(msg)
         self.get_logger().info(f'LED Pattern {pattern_id} gesendet')
-
-    def publish_steering_velocity(self, steering, velocity):
-        """ veröffentlicht ein Message in /2cd/I2CWrite"""
-
-        #--------------------------------------------------------------------
-        # Aufbau einer I2CWrite - Message
-        # ros2 interface show rover_interfaces/msg/I2CWrite
-        #--------------------------------------------------------------------
-        # #-------------------------
-        # # I2C V01 Version
-        # #-------------------------
-        # # grundlegendes Kommando was an den ESP
-        # # verwendet wird
-        # string command
-
-        # #
-        # # Liste der PINS die angesprochen werden
-        # int32[] pins
-        # #
-        # # List der States die ein Pin annehmen soll
-        # int32[] states
-        # #
-        # #
-        # int32 cmd
-        # #
-        # #
-        # int32 subcmd
-        # #
-        # # Liste von 5 Werten. Publisher
-        # # senden float, Wert wird mit 100 Multipliziert
-        # # um uint16 Wert zu erhalten
-        # float64[] data
-
-        msg = I2CWrite()
-        msg.command = "servo"
-        msg.cmd = 1
-        msg.subcmd = 3
-        if self.reverse_steering:
-            steering *= -1
-        if self.reverse_velocity:
-            velocity *= -1
-        msg.data = [velocity, steering, 0.0, 0.0, 0.0]
-        #
-        # I2C_node.py subscribed diese Message
-        # und ruft dort dann den callback: handle_write auf
-        self.publisher.publish(msg) 
-
 
     def cmd_driver_callback(self, msg: Joy):
         axes = msg.axes.tolist()
@@ -240,13 +197,17 @@ class DriverControllerNode(Node):
             steering = axes[self.js_steering]
             now = time.monotonic()
             #
-            # Nur dann Daten versenden, wenn sich zwisch jetzt und letzter Übertragung etwas geändert hat
+            # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
             if (now - self.last_i2c_time >= self.min_interval and
                     (velocity != self.last_velocity or steering != self.last_steering)):
                 self.publish_steering_velocity(steering, velocity)
                 self.last_i2c_time = now
                 self.last_velocity = velocity
                 self.last_steering = steering
+                self.esp32client.write_servo(
+                    steering=steering,
+                    velocity=velocity
+                )
         else:
             self.get_logger().warn("AUTO-MODE noch nicht implementiert")
 

@@ -1,6 +1,7 @@
 
 i2c_node:
   ros__parameters:
+    log_level: INFO
 
     i2c_timer_update: 0.5
     #i2c_bus_id: 1

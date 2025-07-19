@@ -48,6 +48,12 @@ class I2CNode(LifecycleNode):
     def __init__(self):
         self.node_name = self.__class__.__name__
         super().__init__('i2c_node')
+
+        self.declare_parameter("log_level", "INFO")  # Default als Fallback
+        level_str = self.get_parameter("log_level").get_parameter_value().string_value
+        from rclpy.logging import LoggingSeverity
+        log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
+        self.get_logger().set_level(log_level)
         self.get_logger().info("I2C LifecycleNode instantiated")
 
         ct_bus1 = Utilities.get_common_topic('i2c_bus1', 1, logger=self.get_logger())

@@ -8,11 +8,12 @@ from rclpy.parameter import Parameter
 #from .hardware.rover_driver import RoverDriver
 from rover_interfaces.msg import I2CWrite
 from rover_interfaces.msg import LEDMessage
-from rover_interfaces.srv import I2CReadRequest
+from rover_interfaces.srv import I2CESP32Communication
 from .control.led_pattern import LEDPattern
 from .control.ESP32Client import ESP32Client
 from .control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS
 from .control.utilities import Utilities
+from .rover_exceptions import *
 
 class ESP32_PORTS(Enum):
     LED1=18
@@ -41,31 +42,105 @@ class JOYSTICKS(Enum):
 class DriverControllerNode(Node):
     """
     Der DriverControllNode steuert über den I2C_Node die Verbindung zum ESP indem er eine
-    I2CWrite Topic-Nachricht generiert und published.
+    I2CESPCommunication Service-Nachricht versendet. Der Vorteil von Serivce-Nachrichten
+    ist, das der ESP32 mit einem Response antwortet.
+    Somit können auch Daten vom ESP32 empfangen werden
 
-    Publish-Messagess: (OUT)
-    - /i2c/I2CWrite: Message zu Steuerung des ESP32
+    Publish-Service-Message: (OUT)
+    (Versenden von Steering/Velocity Nachrichten)
+    - /i2c/esp32_command: Message zu Steuerung des ESP32
     - /led : LEDMessage Anzeige von LEDPattern (z.B blinken, Warnblinker, ...)
 
     SUBSCRIBE-Messages: (IN)    
     - /joy : Daten des Gamepad-Controllers
 
+    I2CESPCommunication (Service) 
+    ---------------------------------------------------------------------------
+    # Request für den ESP32 verwendet wird
+    #
+    # command:              1=dynamixel, 2=esp32
+    # subcommand:           1=write, 2=read, 3=status
+    # fvalues               bei cmd=1, scmd=1, fvalues[0] = steering-wert, fvalues[1]=velocity-wert
+    # ivalues               bei cmd=2, scmd=1, ivalues[0]=pin1, ivalues[1]=state_pin1, ivalues[2]=pin2, ivalues[2]=state_pin2, ...
+    string device           # 'ESP32'
+    int32 command           # Command für den Slave
+    int32 subcommand        # ggf. SubCommand für den Slave (z.B. esp32)
+    float32[] fvalues         # gefüllt je nach command/subcommand
+    int32[] ivalues         # gefüllt je nach command/subcommand
 
+    ---
+    # Response
+    float32[] fvalues         # gefüllt je nach command/subcommand
+    int32[] ivalues         # gefüllt je nach command/subcommand
+    
+
+    
+    I2CWrite (aktuell nicht verwendet)
+    #-------------------------
+    # I2C V01 Version
+    #-------------------------
+    # grundlegendes Kommando was an den ESP
+    # verwendet wird
+    string command      # Nur String zur Ausgabe, keine funktionaler Inhalt
+    int32[] pins        # Liste an Pins die angesteuert werden können
+    int32[] states      # Liste an States der in pins angegeben Pins
+    int32 cmd           # CommandID - tatsächliche Funktionsaufruf
+    int32 subcmd        # SubCommandID bezogen auf CommandID
+    float64[] data      # bis zu 5 Floatwerte
+
+    LEDMessage
+    #-------------------------
+    int32 pattern
+    string ledtype
+    int32 timeout
+    int32 duration
+    int32 duration_on
+    int32 duration_off
+    float32 brightness
+    int32 ledmask
+    int32[3] color     # RGB: z.B. [255, 100, 0]
+    string callback    # Name des Musters oder Methode, z. B. "blink"    
+    
     """
 
 
     def __init__(self):
+
         super().__init__('driver_controller_node')
         self.node_name = self.__class__.__name__
-        # Parameter auslesen
 
-        ct_tled = Utilities.get_common_topic('topic_led', 1, logger=self.get_logger())
+        # Parameter deklarieren
+        self.logger = self.get_logger()
+        self.declare_parameter("log_level", "INFO")
+        level_str = self.get_parameter("log_level").get_parameter_value().string_value
+
+        # LogLevel setzen (nur wenn nicht via CLI gesetzt)
+        import os
+        from rclpy.logging import LoggingSeverity
+
+        if 'RCUTILS_LOGGING_SEVERITY' not in os.environ:
+            log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
+            self.logger.set_level(log_level)
+
+        self.logger.info(f"{self.node_name} instantiated")
+
+        ct_tled = Utilities.get_common_topic('topic_led', '/led', logger=self.logger)
+        ct_bat = Utilities.get_common_topic('topic_battery', '/battery', logger=self.logger)
+        ct_twrite = Utilities.get_common_topic('i2c_write_topic','/i2c/write', logger=self.logger)
+        ct_srv_esp = Utilities.get_common_topic('i2c_esp_command_srv','/i2c/esp32_command', logger=self.logger)
+
 
         self.declare_parameters(
         namespace='',
         parameters=[
-            ('cmd_vel_topic', '/joy'),
+            # Common config
             ('topic_led', ct_tled),
+            ('topic_battery', ct_bat),
+            ('i2c_write_topic', ct_twrite),
+            ('i2c_esp_command_srv', ct_srv_esp),
+
+            # Node config
+            ('cmd_vel_topic', '/joy'),
             ('reverse_steering', True),
             ('reverse_velocity', False),
             ('map_js_steering', 0),
@@ -75,7 +150,11 @@ class DriverControllerNode(Node):
         ])
 
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
+        self.topic_battery = self.get_parameter('topic_battery').get_parameter_value().string_value
         self.topic_led = self.get_parameter('topic_led').get_parameter_value().string_value
+        self.i2c_write_topic = self.get_parameter('i2c_write_topic').get_parameter_value().string_value
+        self.i2c_esp_command_srv = self.get_parameter('i2c_esp_command_srv').get_parameter_value().string_value
+
         self.reverse_steering = self.get_parameter('reverse_steering').get_parameter_value().bool_value
         self.reverse_velocity = self.get_parameter('reverse_velocity').get_parameter_value().bool_value
         self.map_js_steering = self.get_parameter('map_js_steering').get_parameter_value().integer_value
@@ -83,23 +162,28 @@ class DriverControllerNode(Node):
         self.map_js_cam_turn = self.get_parameter('map_js_cam_turn').get_parameter_value().integer_value
         self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
 
-        self.get_logger().info(
+        self.logger.info(
         f"""
-            DriverControllerNode(Node) config:\n\
-            --------------------------------
-            cmd_vel_topic:          {self.cmd_vel_topic}
-            cmd_vel_topic:          {self.topic_led}
-            reverse_steering:       {self.reverse_steering}
-            reverse_velocity:       {self.reverse_velocity}
-            map_js_steering:        {self.map_js_steering}
-            map_js_velocity:        {self.map_js_velocity}
-            map_js_cam_turn:        {self.map_js_cam_turn}
-            map_js_cam_tilt:        {self.map_js_cam_tilt}
+        DriverControllerNode(Node) config:\n\
+        ---------------------------------------------------
+        COMMON --------------------------------------------
+        cmd_vel_topic:          {self.cmd_vel_topic}
+        topic_led:              {self.topic_led}
+        topic_battery:          {self.topic_battery}
+        i2c_esp_command_srv:     {self.i2c_esp_command_srv}
+
+        DriverControllerNode ------------------------------
+        reverse_steering:       {self.reverse_steering}
+        reverse_velocity:       {self.reverse_velocity}
+        map_js_steering:        {self.map_js_steering}
+        map_js_velocity:        {self.map_js_velocity}
+        map_js_cam_turn:        {self.map_js_cam_turn}
+        map_js_cam_tilt:        {self.map_js_cam_tilt}
         """)
         
-        self.get_logger().info(f"create publisher für I2CWrite")
-        self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
-        self.get_logger().info(f"create publisher für LEDMessages")
+        #self.logger.info(f"create publisher für I2CWrite")
+        #self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
+        self.logger.info(f"create publisher für LEDMessages")
         self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
 
         self.js_velocity = JOYSTICKS.LJ_UD.value
@@ -108,7 +192,7 @@ class DriverControllerNode(Node):
         #
         # teleop-Topic abonnieren
         self.cmd_vel_topic = self.cmd_vel_topic
-        self.get_logger().info(f"create subscription für JoyStick-Commands")
+        self.logger.info(f"create subscription für JoyStick-Commands")
         self.subscription = self.create_subscription(
             Joy,
             self.cmd_vel_topic,
@@ -125,10 +209,18 @@ class DriverControllerNode(Node):
         self.last_i2c_time = time.monotonic()
         self.min_interval = 0.05
 
-        self.esp32client = ESP32Client(self, '/i2c/esp32_command')
-        self.get_logger().info('ESP32Client Objekt erhalten')
-
-        self.get_logger().info('DriverControllerNode gestartet.')
+        try:
+            #
+            #
+            # der ESP32Client ist faktisch die Schnittstelle zwischen dem
+            # driver_controller und dem I2CNode und versendet die Serivce-nachricht
+            self.logger.info('setup ESP32Client')
+            self.esp32client = ESP32Client(self, self.i2c_esp_command_srv)
+            self.logger.info('ESP32Client Objekt erhalten')
+        except RoverException as err:
+            raise RoverException()
+        
+        self.logger.info('DriverControllerNode gestartet.')
 
     def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
         """
@@ -143,7 +235,7 @@ class DriverControllerNode(Node):
         msg.brightness = 1.0
         msg.ledmask = ledmask
         self.led_pub.publish(msg)
-        self.get_logger().info(f'LED Pattern {pattern_id} gesendet')
+        self.logger.info(f'LED Pattern {pattern_id} gesendet')
 
     def cmd_driver_callback(self, msg: Joy):
         axes = msg.axes.tolist()
@@ -190,7 +282,7 @@ class DriverControllerNode(Node):
         if x_button and b_button:
             if not self.toggle_active:
                 self.MODE = "MANUAL" if self.MODE == "AUTO" else "AUTO"
-                self.get_logger().info(f'Modus gewechselt auf: {self.MODE}')
+                self.logger.info(f'Modus gewechselt auf: {self.MODE}')
                 self.toggle_active = True
         else:
             self.toggle_active = False
@@ -207,7 +299,6 @@ class DriverControllerNode(Node):
             # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
             if (now - self.last_i2c_time >= self.min_interval and
                     (velocity != self.last_velocity or steering != self.last_steering)):
-                self.publish_steering_velocity(steering, velocity)
                 self.last_i2c_time = now
                 self.last_velocity = velocity
                 self.last_steering = steering
@@ -216,7 +307,7 @@ class DriverControllerNode(Node):
                     velocity=velocity
                 )
         else:
-            self.get_logger().warn("AUTO-MODE noch nicht implementiert")
+            self.logger.warn("AUTO-MODE noch nicht implementiert")
 
 
 def main(args=None):

@@ -3,6 +3,7 @@
 # ------------------------------------------------------
 sensor_node:
   ros__parameters:
+    log_level: INFO
     #
     # Battery-Sensor liegt am I2C-Bus 
     battery_sample_refresh_hz: 0.1  # Angabe in Herz 0.1hz = alle 10sek
@@ -26,4 +27,4 @@ sensor_node:
     
     # IMU-Sensor liegt am I2C-Bus 1
     imu_sensor_active: false
-    imu_sample_refresh_hz: 100  # Angabe in Herz 100hz
+    imu_sample_refresh_hz: 100.0  # Angabe in Herz 100hz

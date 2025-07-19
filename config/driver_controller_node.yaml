@@ -3,6 +3,8 @@
 # ------------------------------------------------------
 driver_controller_node:
   ros__parameters:
+    log_level: INFO
+
     cmd_vel_topic: "/joy"
     log_level: INFO
     reverse_steering: false

@@ -84,6 +84,13 @@ class SensorNode(LifecycleNode):
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         try:
+
+            self.declare_parameter("log_level", "INFO")  # Default als Fallback
+            level_str = self.get_parameter("log_level").get_parameter_value().string_value
+            from rclpy.logging import LoggingSeverity
+            log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
+            self.get_logger().set_level(log_level)
+
             self.get_logger().info('[SensorNode] on_configure()')
 
             # Parameter auslesen
@@ -321,7 +328,7 @@ class SensorNode(LifecycleNode):
         if self.battery_sensor_active:
             batMsg.battery_level = self.bat_level
             batMsg.battery_voltage = self.bat_voltage
-            batMsg.battery_current = 0.0
+            batMsg.battery_current = self.bat_current
         else:
             self.get_logger().warn('BatterySensor nicht verfügbar ')
             batMsg.battery_current = 0.0
@@ -329,7 +336,7 @@ class SensorNode(LifecycleNode):
             batMsg.battery_level = 100
         try:
             self.battery_publisher.publish(batMsg)
-            self.get_logger().info(f"battery_publisher: {batMsg}")
+            self.get_logger().debug(f"battery_publisher: {batMsg}")
         except Exception as e:
             self.get_logger().warn(f'Konnte Batteriestatus nicht veröffentlichen: {e}')
 

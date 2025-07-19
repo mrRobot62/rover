@@ -3,6 +3,8 @@ from .ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS, SERVICE_RESPONS
 import rclpy
 from typing import List
 from rclpy.node import Node
+from ..rover_exceptions import *
+import time
 
 """
 driver_controller_node
@@ -19,22 +21,34 @@ class ESP32Client:
     """
     def __init__(self, node: Node, channel):
         self.node = node
-        self.client = node.create_client(I2CESP32Communication, channel)
-        while not self.client.wait_for_service(timeout_sec=1.0):
-            self.node.get_logger().warn(f'{channel} not available...')
+        # self.client = node.create_client(I2CESP32Communication, channel)
+        # while not self.client.wait_for_service(timeout_sec=1.0):
+        #     #self.node.get_logger().error(f"ESP32Client: service channel: '{channel}' not available...")
+        #     raise ServiceNotAvailableException(f"I2CESP32Communication channel: {channel} not available")
 
-    def write_servo_sv(self, steering: float, velocity: float) -> int: 
+        self.client = node.create_client(I2CESP32Communication, channel)
+
+        max_wait_time = 5.0  # Sekunden
+        start_time = time.time()
+
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            elapsed = time.time() - start_time
+            self.node.get_logger().warn(f"ESP32Client: warte auf Service '{channel}' ({elapsed:.1f}s)")
+            if elapsed > max_wait_time:
+                raise ServiceNotAvailableException(f"I2CESP32Communication channel: {channel} not available nach {elapsed:.1f}s")
+
+    def write_servo(self, steering: float, velocity: float) -> int: 
         """
         Generiert einen Befehlssatz für Steering und Velocity
         CommandID.SERVO_WRITE & SubCommandID.SCMD_SERVO_SPEED_POSITION
         """
         request = I2CESP32Communication.Request()
-        request.device = "ESP32"
+        request.device = "  dsESP32"
         request.command = CommandID.SERVO_WRITE.value
         request.subcommand = SubCommandID.SCMD_SERVO_SPEED_POSITION.value
         request.fvalues = []
-        request.fvalues[0] = steering
-        request.fvalues[1] = velocity
+        request.fvalues.append(steering)
+        request.fvalues.append(velocity)
         request.ivalues = []
 
         future = self.client.call_async(request)
@@ -51,14 +65,14 @@ class ESP32Client:
             return SERVICE_RESPONSE.SLAVE_RESPONSE_EMPTY.value
         return result.ivalues[0]  # z. B. 0 = OK, <>0 = ESP32-Fehler
 
-    def write_servo(self, cmd, scmd, fvalues: List[float], ivalues: List[int]) -> int:
-        """
-        Generiert einen Befehlssatz basierend auf cmd udn scmd. Die dazugehörigen Werte sehen in
-        fvalues und ivalues
-        """
+    # def write_servo(self, cmd, scmd, fvalues: List[float], ivalues: List[int]) -> int:
+    #     """
+    #     Generiert einen Befehlssatz basierend auf cmd und scmd. Die dazugehörigen Werte sehen in
+    #     fvalues und ivalues
+    #     """
 
-        # return  result.ivalues[0]  # z. B. 0 = OK, <>0 = ESP32-Fehler
-        return 0
+    #     # return  result.ivalues[0]  # z. B. 0 = OK, <>0 = ESP32-Fehler
+    #     return 0
 
     def read_servo(self):
         request = I2CESP32Communication.Request()

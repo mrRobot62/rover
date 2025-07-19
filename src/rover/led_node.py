@@ -232,6 +232,11 @@ class LEDPatternLoader:
 class LEDNode(Node):
     def __init__(self):
         super().__init__('led_node')
+        self.declare_parameter("log_level", "INFO")  # Default als Fallback
+        level_str = self.get_parameter("log_level").get_parameter_value().string_value
+        from rclpy.logging import LoggingSeverity
+        log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
+        self.get_logger().set_level(log_level)
 
         # Parameter auslesen
         self.declare_parameters(
@@ -297,7 +302,7 @@ class LEDNode(Node):
     def led_callback(self, msg):
         #
         # ist die empfangene patternID eine valide ID? Wenn nein wird 0 angenommen
-        self.get_logger().info(f"Subscribed Message: {msg}")
+        self.get_logger().debug(f"Subscribed Message: {msg}")
 
         # Werte aus der Message:
         # - wenn Publisher pattern > 0 sendet, dann wird das build-in Pattern verwendet 
@@ -387,8 +392,8 @@ class LEDNode(Node):
         # das ist der eigentliche Methoden-Aufruf mit übergabe der Parameter.
         # es wird der Platzhalter callback genutzt um die tatsächliche Methode aufzurufen
         callback(**params)
-        self.get_logger().info(
-            f"[method(**params)]: Call {patternObj.led} Mask:{bin(params['ledmask'])}"
+        self.get_logger().debug(
+            f"Call {patternObj.led} Mask:{bin(params['ledmask'])}"
         )
 
 def main(args=None):

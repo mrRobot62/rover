@@ -32,6 +32,7 @@ def generate_launch_description():
     params_i2c_node = os.path.join(share_dir, 'config', 'i2c_node.yaml')
     params_sensor_node = os.path.join(share_dir, 'config', 'sensor_node.yaml')
     params_driver_controller_node = os.path.join(share_dir, 'config', 'driver_controller_node.yaml')
+    params_led_node = os.path.join(share_dir, 'config', 'led_node.yaml')
     #params_common_file = os.path.join(share_dir, 'config', 'rover_common.yaml')
 
 
@@ -235,7 +236,7 @@ def generate_launch_description():
         executable='led_node',
         name='led_node',
         output='screen',
-        parameters=[params_file]
+        parameters=[params_led_node]
     )
 
     #--------------------------------------------------------------------------------------

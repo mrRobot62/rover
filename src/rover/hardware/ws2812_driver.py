@@ -55,6 +55,7 @@ class WS2812SPI:
         self._blink_thread = None
         self._run_thread = None
         self._circle_thread = None
+        self._cmasked_thread = None
 
         self.driver = neopixel_spi.NeoPixel_SPI(
             board.SPI(),
@@ -156,7 +157,6 @@ class WS2812SPI:
 
         # Positionen der aktiven LEDs extrahieren
         active_indices = [i for i in range(self.num_pixels) if ledmask & (1 << i)]
-        print(f"ws2812.RUN active LEDs: {active_indices}")
 
         def _run_loop():
             while not self._stop_event.is_set():
@@ -173,11 +173,12 @@ class WS2812SPI:
                         return
 
                     # LED i AUS
-                    self.driver[i] = (0, 0, 0)
-                    self.driver.show()
+                    if duration_off > 0:
+                        self.driver[i] = (0, 0, 0)
+                        self.driver.show()
 
-                    if self._wait_or_stop(duration_off):
-                        return
+                        if self._wait_or_stop(duration_off):
+                            return
 
                     # Wartezeit bis nächste LED beginnt
                     if self._wait_or_stop(timeout):
@@ -204,11 +205,24 @@ class WS2812SPI:
         self.stop()
         color = self.apply_brightness(color)
 
-        # Erzeuge Gruppen: LEDs 1–6 je Ring (überspringt LED0 je Ring)
-        led_groups = []
-        for i in range(1, 7):  # LED-Index innerhalb des Rings
-            group = [i, i + 7, i + 14, i + 21]
-            led_groups.append(group)
+        # Definiere LED-Indizes pro Schritt (synchron über alle Ringe)
+        s = 1
+
+        ring_steps = [
+            [s,     s+7,    s+14, s+21],
+            [s+1,   s+8,    s+15, s+22],
+            [s+2,   s+9,    s+16, s+23],
+            [s+3,   s+10,   s+17, s+24],
+            [s+4,   s+11,   s+18, s+25],
+            [s+5,   s+12,   s+19, s+26],
+        ]
+
+        # [1, 8, 15, 22],
+        # [2, 9, 16, 23],
+        # [3, 10, 17, 24],
+        # [4, 11, 18, 25],
+        # [5, 12, 19, 26],
+        # [6, 13, 20, 27],
 
         def _circle_loop():
             start_time = time.time()
@@ -217,31 +231,30 @@ class WS2812SPI:
                 if timeout > 0 and elapsed >= timeout:
                     break
 
-                for group in led_groups:
+                # Alles aus zu Beginn eines Zyklus
+                self.driver.fill((0, 0, 0))
+                self.driver.show()
+
+                # Aufbauendes Lauflicht – Schrittweise
+                for step in ring_steps:
                     if self._stop_event.is_set():
-                        break
+                        return
 
-                    elapsed = (time.time() - start_time) * 1000
-                    if timeout > 0 and elapsed >= timeout:
-                        break
-
-                    # LEDs aktivieren
-                    for i in range(self.num_pixels):
-                        self.driver[i] = color if i in group else (0, 0, 0)
+                    for led in step:
+                        self.driver[led] = color
                     self.driver.show()
 
                     if self._wait_or_stop(duration_on):
                         return
 
-                    # LEDs deaktivieren
-                    for i in group:
-                        self.driver[i] = (0, 0, 0)
-                    self.driver.show()
+                # Pause mit allen LEDs aus
+                if self._wait_or_stop(duration_off):
+                    return
 
-                    if self._wait_or_stop(duration_off):
-                        return
+                self.driver.fill((0, 0, 0))
+                self.driver.show()
 
-            # Alle LEDs am Ende ausschalten
+            # Zum Schluss sicher ausschalten
             self.driver.fill((0, 0, 0))
             self.driver.show()
 
@@ -249,6 +262,68 @@ class WS2812SPI:
         self._circle_thread.start()
 
 
+    def cmasked(self, color=(0, 255, 0), duration_on=100, duration_off=50, timeout=3000, ledmask=0x3FFFFF, **kwargs):
+        """
+        cmasked ist circle() erweitert und baut sich auf wie in ledmask angegeben. Eine LED nach der anderen.
+        Verzögerung duration_on, off-Phase mit duration_off, solange bis timeout.
+
+        :param color: Farbe der LEDs
+        :param duration_on: An-Zeit jeder LED-Gruppe (ms)
+        :param duration_off: Aus-Zeit nach jedem Schritt (ms)
+        :param timeout: Gesamtdauer des Effekts (ms)
+        """
+        self.stop()
+        color = self.apply_brightness(color)
+
+        # LEDs 1–28 (Index 1 bis 28)
+        active_leds = []
+        for i in range(28):
+            if (ledmask >> i) & 0b1:
+                active_leds.append(i + 1)  # LED-Index beginnt bei 1
+
+        # Gruppiere aktive LEDs nach Reihenfolge (z. B. [1, 8, 15, 22] → Schritt 1)
+        # nach Position im Ring → angenommen: LEDs liegen sequentiell
+        # Schrittweise Aufbau über Position 1–6
+        ring_steps = []
+        for pos in range(6):  # Position 1–6 (wir lassen LED0/7 außen vor)
+            step = []
+            for ring in range(4):
+                led_index = ring * 7 + pos + 1  # LED 1–6, 8–13, 15–20, 22–27
+                if led_index in active_leds:
+                    step.append(led_index)
+            if step:
+                ring_steps.append(step)
+
+            def _cmask_loop():
+                start_time = time.time()
+                while not self._stop_event.is_set():
+                    elapsed = (time.time() - start_time) * 1000
+                    if timeout > 0 and elapsed >= timeout:
+                        break
+
+                    self.driver.fill((0, 0, 0))
+                    self.driver.show()
+
+                    for step in ring_steps:
+                        if self._stop_event.is_set():
+                            return
+                        for led in step:
+                            self.driver[led] = color
+                        self.driver.show()
+                        if self._wait_or_stop(duration_on):
+                            return
+
+                    if self._wait_or_stop(duration_off):
+                        return
+
+                    self.driver.fill((0, 0, 0))
+                    self.driver.show()
+
+                self.driver.fill((0, 0, 0))
+                self.driver.show()
+
+            self._cmasked_thread = threading.Thread(target=_cmask_loop, daemon=True)
+            self._cmasked_thread.start()
 
     def _wait_or_stop(self, duration_ms):
         """
@@ -283,7 +358,7 @@ class WS2812SPI:
         Stoppt ggf. laufende Blink- oder Pattern-Threads.
         """
         self._stop_event.set()
-        for thread in [self._fill_thread, self._blink_thread, self._run_thread, self._circle_thread]:
+        for thread in [self._fill_thread, self._blink_thread, self._run_thread, self._circle_thread, self._cmasked_thread]:
             if thread and thread.is_alive():
                 thread.join()
         self._stop_event.clear()

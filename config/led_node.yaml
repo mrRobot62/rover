@@ -3,7 +3,7 @@
 # ------------------------------------------------------
 led_node:
   ros__parameters:
-    log_level: WARN
+    log_level: DEBUG
 
     led_topic: "/led"
     led_type: "WS2812"

@@ -1,0 +1,6 @@
+# ------------------------------------------------------
+# VISION  spezifische Konfigurationen
+# ------------------------------------------------------
+vision_node:
+  ros__parameters:
+    vison_topic: "/vision/result"

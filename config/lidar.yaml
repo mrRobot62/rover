@@ -1,0 +1,27 @@
+
+# ------------------------------------------------------
+# der verwendete Lidar soll generisch eingebunden werden
+# Default lidar_model:=ydlidar
+#         lidar_model:=xv11 (Alternativ)
+# ------------------------------------------------------
+ydlidar:
+  ros__parameters:
+    port: "/dev/ttyUSB0"
+    baudrate: 230400
+    frame_id: "laser_frame"
+    lidar_topic: "/scan"
+    model: "T-mini Plus"
+    # diese Launch nutzt TransformNodes
+    # ydlidar_launch: "full_lidar.launch.py"
+
+    # diese Launch nutzt keine Transform (T2) Nodes !
+    ydlidar_launch: "only_lidar_driver.launch.py"
+    ydlidar_param: "TminiPro.yaml"
+
+xv11:
+  ros__parameters:
+    port: "/dev/ttyUSB1"
+    frame_id: "laser_frame"
+    lidar_topic: "/scan"
+    scan_rate_hz: 5
+

@@ -328,15 +328,15 @@ class I2CNode(LifecycleNode):
             response.ivalues = [-1]  # Fehlercode
             return response
         try:
-            self.get_logger().info(f"--S1")
+            #self.get_logger().info(f"--S1")
             if request.command == CommandID.SERVO_WRITE.value:
                 if request.subcommand == SubCommandID.SCMD_SERVO_SPEED_POSITION.value:
-                    self.get_logger().info(f"--S2")
+                    #self.get_logger().info(f"--S2")
                     steering = request.fvalues[0]
                     velocity = request.fvalues[1]
                     steering = Utilities.clamp(steering, -1.0, +1.0)
                     velocity = Utilities.clamp(velocity, -1.0, +1.0)
-                    self.get_logger().info(f"--S3")
+                    #self.get_logger().info(f"--S3")
                     #
                     # Die Float-Daten müssen umgewandelt werden in einen
                     # Wertebereich von 0-65535
@@ -345,8 +345,6 @@ class I2CNode(LifecycleNode):
                         slave_address=self.i2c_esp_addr,
                         cmd=request.command,
                         scmd=request.subcommand,
-                        #
-                        # Float-Values müssen in Integer umgewandelt werden
                         data_vals = data,
                         response=response
                     )
@@ -381,7 +379,7 @@ class I2CNode(LifecycleNode):
             msg.channel_2 = round(self.ads.read_voltage(2),3)
             msg.channel_3 = round(self.ads.read_voltage(3),3)
             self.pub_batt.publish(msg)
-            self.get_logger().info(f"Publish BatteryRaw: {msg}")
+            self.get_logger().debug(f"Publish BatteryRaw: {msg}")
         except Exception as e:
             self.get_logger().error(f"ADS1115 Fehler: {e}")
 
@@ -413,8 +411,8 @@ class I2CNode(LifecycleNode):
 
             # Umwandeln in Liste von ints für write_i2c_block_data
             packet_list = list(packet)
-            #self.get_logger().info(f"[__send_esp32_packet] -- 4 {packet_list}")
             self.bus.write_i2c_block_data(slave_address, 0x00, packet_list)
+            self.get_logger().debug(f"[__send_esp32_packet] : {packet_list}")
             self.get_logger().info(f"[__send_esp32_packet] write_i2c_block_data done")
         except Exception as e:
             self.get_logger().error(f"I2C-Error: {e}")

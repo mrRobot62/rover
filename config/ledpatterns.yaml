@@ -57,6 +57,24 @@ anchors:
     brightness: 0.3
     ledmask: 0x3FFFFF  # alle LEDs
 
+  default_circle: &default_circle
+    callback: "circle"
+    ledtype: "WS2812"
+    timeout: 5000
+    duration_on: 100
+    duration_off: 50
+    brightness: 0.3
+    ledmask: 0x1111110111111011111101111110 # Alle bis auf Center
+
+
+  default_cmasked: &default_cmasked
+    callback: "cmasked"
+    ledtype: "WS2812"
+    timeout: 5000
+    duration_on: 100
+    duration_off: 50
+    brightness: 0.3
+    ledmask: 0x1111110111111011111101111110 # Alle bis auf Center
 
 # ----------------------------------------------------------------------------------------
 # Build-in Pattern:NONE, OFF, etc.
@@ -134,40 +152,47 @@ anchors:
 
 # --- Battery ---
 61:
-  <<: [ *defaults]
+  <<: [ *default_cmasked]
   name: "BAT100"
   color: [51, 229, 0]
-  ledmask: 0b1111110111111011111101111110
+  duration_off: 100
+  ledmask: 0b1111111111111111111111111111
 
 62:
-  <<: [*CENTER_ALL, *defaults]
+  <<: [*default_cmasked]
   name: "BAT90"
   color: [0, 255, 0]
-  ledmask: 0b0111110011111001111100111110
+  duration_off: 100
+  ledmask: 0b0111111011111101111110111111
 
 63:
-  <<: [*defaults]
+  <<: [*default_cmasked]
   name: "BAT80"
   color: [102, 204, 0]
-  ledmask: 0b0011110001111000111100011110
+  timeout: 3000
+  duration_off: 100
+  ledmask: 0b0011111001111100111110011111
 
 64:
-  <<: [*defaults]
+  <<: [*default_cmasked]
   name: "BAT70"
   color: [153, 178, 0]
-  ledmask: 0b0001110000111000011100001110
+  duration_off: 100
+  ledmask: 0b0001111000111100011110001111
 
 65:
-  <<: [*defaults]
+  <<: [*default_cmasked]
   name: "BAT60"
   color: [204, 153, 0]
-  ledmask: 0b0000110000011000001100000110
+  duration_off: 100
+  ledmask: 0b0000111000011100001110000111
 
 66:
-  <<: [*defaults]
+  <<: [*default_cmasked]
   name: "BAT50"
   color: [255, 127, 0]
-  ledmask: 0b0000010000001000000100000010
+  duration_off: 100
+  ledmask: 0b0000011000001100000110000011
 
 67:
   <<: [*CENTER_ALL, *defaults]

@@ -28,12 +28,16 @@ def generate_launch_description():
     share_dir = get_package_share_directory('rover')
     rviz_config_file = os.path.join(share_dir, 'config/rviz', 'rover.rviz')
     urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
-    params_file = os.path.join(share_dir, 'config', 'rover.yaml')
+    #params_file = os.path.join(share_dir, 'config', 'rover.yaml')
     params_i2c_node = os.path.join(share_dir, 'config', 'i2c_node.yaml')
     params_sensor_node = os.path.join(share_dir, 'config', 'sensor_node.yaml')
     params_driver_controller_node = os.path.join(share_dir, 'config', 'driver_controller_node.yaml')
     params_led_node = os.path.join(share_dir, 'config', 'led_node.yaml')
-    #params_common_file = os.path.join(share_dir, 'config', 'rover_common.yaml')
+    params_vision_node = os.path.join(share_dir, 'config', 'vision_node.yaml')
+    params_odom_node = os.path.join(share_dir, 'config', 'odom_node.yaml')
+    params_navigation_node = os.path.join(share_dir, 'config', 'navigation_node.yaml')
+    params_lidar = os.path.join(share_dir, 'config', 'lidar.yaml')
+    params_common = os.path.join(share_dir, 'config', 'rover_common.yaml')
 
 
     # Liste der Lifecycle-Nodes (name, executable)
@@ -66,7 +70,7 @@ def generate_launch_description():
         output='screen',
         namespace='/',
         parameters=[
-            LaunchConfiguration('params_file'),
+            LaunchConfiguration('params_se'),
             {'lidar_topic': lidar_topic}
         ]
     )
@@ -80,7 +84,7 @@ def generate_launch_description():
     #
     def create_lidar_node(context):
         model = context.launch_configurations['lidar_model']
-        params = load_rover_params(params_file, model)
+        params = load_rover_params(params_lidar, model)
 
         nodes = []
 
@@ -107,7 +111,7 @@ def generate_launch_description():
             nodes.append(IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(ydlidar_launch_path),
                 launch_arguments={
-                    'params_file' : ydlidar_param_path
+                    'params_lidar' : ydlidar_param_path
                 }.items()
 
             ))
@@ -145,13 +149,10 @@ def generate_launch_description():
 
     # 🧾 Launch-Argumente
     params_file_arg = DeclareLaunchArgument(
-        'params_file',
-        default_value=params_file,
-        description='Pfad zur Parameterdatei des Rovers'
+        'params_common',
+        default_value=params_common,
+        description='Pfad zur Common-Parameterdatei des Rovers'
     )
-
-
-
 
     """
     Transform-Node. Dieser Node Transformiert die Welt-Koordinaten auf base_link
@@ -219,7 +220,7 @@ def generate_launch_description():
         name='navigation_node',
         output='screen',
         #parameters=[LaunchConfiguration('params_file')]
-        parameters=[params_file]
+        parameters=[params_navigation_node]
     )
 
     # LED Node
@@ -258,7 +259,7 @@ def generate_launch_description():
             name='odom_node',
             output='screen',
             namespace='/',
-            parameters=[params_file]
+            parameters=[params_odom_node]
         ),
         LifecycleNode(
             package='rover',
@@ -266,7 +267,7 @@ def generate_launch_description():
             name='vision_node',
             output='screen',
             namespace='/',
-            parameters=[params_file]
+            parameters=[params_vision_node]
         ),
         LifecycleNode(
             package='rover',

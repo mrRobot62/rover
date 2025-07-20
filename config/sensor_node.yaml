@@ -3,7 +3,7 @@
 # ------------------------------------------------------
 sensor_node:
   ros__parameters:
-    log_level: INFO
+    log_level: DEBUG
     #
     # Battery-Sensor liegt am I2C-Bus 
     battery_sample_refresh_hz: 0.1  # Angabe in Herz 0.1hz = alle 10sek
@@ -12,11 +12,11 @@ sensor_node:
     battery_sensor_active: true
 #    battery_critical: 12.4        # hier schaltet der rover ab, 4S, 4x 3.25V/Zelle
 #    battery_low: 13.6             # unterste Spannung, Rover fährt noch 4x 3.4V/Zelle
-    battery_full: 16.8            # 4S-Lipo 4x4.2V = 16.8V am Eingang des Voltage-Sensors
+    battery_full: 13.0            # 4S-Lipo 4x4.2V = 16.8V am Eingang des Voltage-Sensors
 
     # NUR FÜR TEST BEI 12 EINGANGS_SPANNUNG
     battery_critical: 11.0        # nur für Grenzen zu testen
-    battery_low: 11.5             # nur für Grenzen zu testen
+    battery_low: 11.0             # nur für Grenzen zu testen
 #    battery_full: 12.2           # nur für Grenzen zu testen
 
     #

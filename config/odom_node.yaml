@@ -1,0 +1,8 @@
+# ------------------------------------------------------
+# ODOMETRIE spezifische Konfigurationen
+# ------------------------------------------------------
+odom_node:
+  ros__parameters:
+    log_level: INFO
+    speed: 0.5
+    angle: 30

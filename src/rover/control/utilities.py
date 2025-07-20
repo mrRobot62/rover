@@ -59,7 +59,25 @@ class Utilities:
     @staticmethod
     def get_value_or_default(my_dict, key, default_key=5):
         return my_dict.get(key, my_dict.get(default_key))
-    
+
+    @staticmethod
+    def get_rounded_int_key(my_dict:dict, key: int):
+        """
+        Sucht in my_dict key. Runded key auf den nächsten 10er auf oder ab.
+        43 => 40, 45 => 50 usw
+        """
+        if key in my_dict:
+            return my_dict[key]
+        
+        key = Utilities.clamp(key, 0, 100)
+        # runden auf die nächste 10er Stufe
+        lower = (key // 10) * 10
+        upper = lower + 10
+        if key - lower < 5:
+            return my_dict[lower]
+        else:
+            return my_dict[min(upper,100)]
+        
     @staticmethod
     def load_yaml_file(relative_path: str) -> dict:
         """

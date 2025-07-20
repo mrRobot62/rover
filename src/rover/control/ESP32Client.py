@@ -43,7 +43,7 @@ class ESP32Client:
         CommandID.SERVO_WRITE & SubCommandID.SCMD_SERVO_SPEED_POSITION
         """
         request = I2CESP32Communication.Request()
-        request.device = "  dsESP32"
+        request.device = "ESP32"
         request.command = CommandID.SERVO_WRITE.value
         request.subcommand = SubCommandID.SCMD_SERVO_SPEED_POSITION.value
         request.fvalues = []

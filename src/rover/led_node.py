@@ -284,7 +284,13 @@ class LEDNode(Node):
             10
         )
 
-        self.get_logger().info('LEDNode gestartet')
+        msg = LEDMessage()
+        msg.pattern=1
+        msg.timeout=0
+        msg.duration_off=0
+        msg.duration_on=0
+        self.led_callback(msg)
+        self.get_logger().info('LEDNode gestartet (LEDs OFF)')
 
     def validate_led_pattern(self, pattern_id: int) -> bool:
         """
@@ -372,7 +378,7 @@ class LEDNode(Node):
         # Python-Hack
         # mit der Funktion getattr liest man aus, welche Attribute ein Objekt hat (z.B. WS2812())
         # Da wir ja den LEDDriver (WS2812) nutzen, benötigen wir nun die Methoden die diese Klasse zur
-        # Verfügung stellt (fill(), blink(), run(), circle()) im Prinzip sind das die callback funktionen
+        # Verfügung stellt (fill(), blink(), run(), circle(), cmasked()) im Prinzip sind das die callback funktionen
         callback = getattr(patternObj.led, callbackFnc, None)
         self.get_logger().debug(f"---- [LEDNode] callbackFnc: {callbackFnc} Object: {callback}")
 

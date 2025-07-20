@@ -1,0 +1,6 @@
+# ------------------------------------------------------
+# NAVIGATION spezifische Konfigurationen
+# ------------------------------------------------------
+navigation_node:
+  ros__parameters:
+    log_level: INFO

@@ -17,6 +17,7 @@ from .sensors.lidar_sensor import LidarSensor
 from .sensors.depr_battery_sensor import BatterySensor, BatteryStatus, PowerStatus
 from .control.led_pattern import LEDPattern
 from .control.BatteryClient import BatteryClient
+from .control.utilities import Utilities
 
 from rover_interfaces.msg import Battery, LEDMessage
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -321,6 +322,7 @@ class SensorNode(LifecycleNode):
         self.bat_current = current
         #self.get_logger().info(f"_callback_battery_client({self.bat_voltage}, {self.bat_level})")
 
+        
     def publish_battery_state(self):
         # publish_battery_state ist timer gesteuert und wird alle x-Sekunden aufgerufen. Siehe self.timer = self.create_timer(10.0, self.publish_battery_state)
         # Um unnötige Publishs zu vermeiden wird ein tatsächlicher publish nur dann durchgeführt, wenn sich tatsächlich eine Änderung ergeben hat        
@@ -344,8 +346,12 @@ class SensorNode(LifecycleNode):
         try:
             ledMsg = LEDMessage()
             ledMsg.ledtype = 'WS2812'
-            ledMsg.pattern = self.battery_levels.get(batMsg.battery_level,LEDPattern.BATTERY_0.value)
-
+            ledMsg.pattern = Utilities.get_rounded_int_key(self.battery_levels, batMsg.battery_level)
+            ledMsg.timeout = -1         # Zwingt LEDNode dazu die Defaultwerte zu nutzen
+            ledMsg.duration_off = -1    # Zwingt LEDNode dazu die Defaultwerte zu nutzen
+            ledMsg.duration_on = -1     # Zwingt LEDNode dazu die Defaultwerte zu nutzen
+            #ledMsg.ledmask = 0          # Zwingt LEDNode dazu die Defaultwerte zu nutzen
+            self.get_logger().debug(f"---> {ledMsg.pattern} = Utilities.get_rounded_int_key({batMsg.battery_level})")
             self.led_publisher.publish(ledMsg)            
             self.get_logger().info(f"Published LEDMessage() '{ledMsg}'")            
         except Exception as e:
@@ -353,11 +359,12 @@ class SensorNode(LifecycleNode):
 
 
     def publish_imu_state(self):
-        self.get_logger().debug('[SensorNode] read_and_publish_imu() – noch nicht implementiert')
+        #self.get_logger().debug('[SensorNode] read_and_publish_imu() – noch nicht implementiert')
         # try:
         #     self.imu_publisher.publish(msg)
         # except Exception as e:
         #     self.get_logger().warn(f'Konnte IMU-Daten nicht veröffentlichen: {e}')
+        pass
 
 def main(args=None):
     rclpy.init(args=args)

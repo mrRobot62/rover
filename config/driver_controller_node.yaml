@@ -3,10 +3,9 @@
 # ------------------------------------------------------
 driver_controller_node:
   ros__parameters:
-    log_level: INFO
+    log_level: DEBUG
 
     cmd_vel_topic: "/joy"
-    log_level: INFO
     reverse_steering: false
     reverse_velocity: false
     # Joystick mappings

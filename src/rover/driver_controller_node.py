@@ -110,24 +110,18 @@ class DriverControllerNode(Node):
         self.node_name = self.__class__.__name__
 
         # Parameter deklarieren
-        self.logger = self.get_logger()
-        self.declare_parameter("log_level", "INFO")
+        self.declare_parameter("log_level", "INFO")  # Default als Fallback
         level_str = self.get_parameter("log_level").get_parameter_value().string_value
-
-        # LogLevel setzen (nur wenn nicht via CLI gesetzt)
-        import os
         from rclpy.logging import LoggingSeverity
+        log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
+        self.get_logger().set_level(log_level)
 
-        if 'RCUTILS_LOGGING_SEVERITY' not in os.environ:
-            log_level = getattr(LoggingSeverity, level_str.upper(), LoggingSeverity.INFO)
-            self.logger.set_level(log_level)
+        self.get_logger().info(f"{self.node_name} instantiated")
 
-        self.logger.info(f"{self.node_name} instantiated")
-
-        ct_tled = Utilities.get_common_topic('topic_led', '/led', logger=self.logger)
-        ct_bat = Utilities.get_common_topic('topic_battery', '/battery', logger=self.logger)
-        ct_twrite = Utilities.get_common_topic('i2c_write_topic','/i2c/write', logger=self.logger)
-        ct_srv_esp = Utilities.get_common_topic('i2c_esp_command_srv','/i2c/esp32_command', logger=self.logger)
+        ct_tled = Utilities.get_common_topic('topic_led', '/led', logger=self.get_logger())
+        ct_bat = Utilities.get_common_topic('topic_battery', '/battery', logger=self.get_logger())
+        ct_twrite = Utilities.get_common_topic('i2c_write_topic','/i2c/write', logger=self.get_logger())
+        ct_srv_esp = Utilities.get_common_topic('i2c_esp_command_srv','/i2c/esp32_command', logger=self.get_logger())
 
 
         self.declare_parameters(
@@ -162,7 +156,7 @@ class DriverControllerNode(Node):
         self.map_js_cam_turn = self.get_parameter('map_js_cam_turn').get_parameter_value().integer_value
         self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
 
-        self.logger.info(
+        self.get_logger().info(
         f"""
         DriverControllerNode(Node) config:\n\
         ---------------------------------------------------
@@ -181,9 +175,9 @@ class DriverControllerNode(Node):
         map_js_cam_tilt:        {self.map_js_cam_tilt}
         """)
         
-        #self.logger.info(f"create publisher für I2CWrite")
+        #self.get_logger().info(f"create publisher für I2CWrite")
         #self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
-        self.logger.info(f"create publisher für LEDMessages")
+        self.get_logger().info(f"create publisher für LEDMessages")
         self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
 
         self.js_velocity = JOYSTICKS.LJ_UD.value
@@ -192,7 +186,7 @@ class DriverControllerNode(Node):
         #
         # teleop-Topic abonnieren
         self.cmd_vel_topic = self.cmd_vel_topic
-        self.logger.info(f"create subscription für JoyStick-Commands")
+        self.get_logger().info(f"create subscription für JoyStick-Commands")
         self.subscription = self.create_subscription(
             Joy,
             self.cmd_vel_topic,
@@ -214,13 +208,13 @@ class DriverControllerNode(Node):
             #
             # der ESP32Client ist faktisch die Schnittstelle zwischen dem
             # driver_controller und dem I2CNode und versendet die Serivce-nachricht
-            self.logger.info('setup ESP32Client')
+            self.get_logger().info('setup ESP32Client')
             self.esp32client = ESP32Client(self, self.i2c_esp_command_srv)
-            self.logger.info('ESP32Client Objekt erhalten')
+            self.get_logger().info('ESP32Client Objekt erhalten')
         except RoverException as err:
             raise RoverException()
         
-        self.logger.info('DriverControllerNode gestartet.')
+        self.get_logger().info('DriverControllerNode gestartet.')
 
     def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
         """
@@ -229,19 +223,18 @@ class DriverControllerNode(Node):
         msg.pattern = pattern_id
         msg.ledtype = "WS2812"
         msg.timeout = timeout
-        msg.duration = 0
         msg.duration_on = duration_on
         msg.duration_off = duration_off
-        msg.brightness = 1.0
         msg.ledmask = ledmask
         self.led_pub.publish(msg)
-        self.logger.info(f'LED Pattern {pattern_id} gesendet')
+        self.get_logger().info(f"Published LEDMessage() '{msg}'")            
 
     def cmd_driver_callback(self, msg: Joy):
         axes = msg.axes.tolist()
         axes = [round(x, 3) for x in msg.axes]
         buttons = msg.buttons.tolist()
 
+        #self.get_logger().debug(f"cmd_driver_callback({msg})")
         #
         # für einfacheren Zugriff, buttons in Variablen ablegen
         x_button = buttons[BUTTONS.X.value]
@@ -250,39 +243,50 @@ class DriverControllerNode(Node):
         rb_button = buttons[BUTTONS.RB.value]
 
         if self.last_buttons is not None:
-
-            #
-            # Links blinken
-            if lb_button and not self.last_buttons[BUTTONS.LB.value]:
-                self.publish_led_pattern(
-                    pattern_id=LEDPattern.BLINK_LEFT, 
-                    duration_on=500, 
-                    duration_off=500,
-                    ledmask = 0b00011100001110
-                )
-
-            #
-            # Rechts blinken
-            if rb_button and not self.last_buttons[BUTTONS.RB.value]:
-                self.publish_led_pattern(
-                    pattern_id=LEDPattern.BLINK_RIGHT, 
-                    duration_on=500, 
-                    duration_off=500,
-                    ledmask = 0b01110000111000
-                )            #
             # Warnblink
             if rb_button and lb_button:
                 self.publish_led_pattern(
-                    pattern_id=LEDPattern.HAZARD_LIGHT,
-                    duration_on=500, 
-                    duration_off=500,
-                    ledmask = 0xFFFFFFF
+                    pattern_id=LEDPattern.OFF.value,
+                    timeout=-1,
+                    duration_on=-1, 
+                    duration_off=-1,
+                    ledmask = 0
                 )
+                self.publish_led_pattern(
+                    pattern_id=LEDPattern.HAZARD.value,
+                    timeout=-1,
+                    duration_on=-1, 
+                    duration_off=-1,
+                    ledmask = 0
+                )
+            else:
+                #
+                # Links blinken
+                if lb_button and not self.last_buttons[BUTTONS.LB.value]:
+                    self.publish_led_pattern(
+                        pattern_id=LEDPattern.BLINK_LEFT.value,
+                        timeout=-1,
+                        duration_on=-1,
+                        duration_off=-1,
+                        ledmask=0
+                    )
+
+                #
+                # Rechts blinken
+                if rb_button and not self.last_buttons[BUTTONS.RB.value]:
+                    self.publish_led_pattern(
+                        pattern_id=LEDPattern.BLINK_RIGHT.value, 
+                        timeout=-1,
+                        duration_on=-1, 
+                        duration_off=-1,
+                        ledmask=0
+                    )
+
 
         if x_button and b_button:
             if not self.toggle_active:
                 self.MODE = "MANUAL" if self.MODE == "AUTO" else "AUTO"
-                self.logger.info(f'Modus gewechselt auf: {self.MODE}')
+                self.get_logger().info(f'Modus gewechselt auf: {self.MODE}')
                 self.toggle_active = True
         else:
             self.toggle_active = False
@@ -291,23 +295,23 @@ class DriverControllerNode(Node):
             self.last_axes = list(axes)
             self.last_buttons = list(buttons)
 
-        if self.MODE == "MANUAL":
-            velocity = axes[self.js_velocity]
-            steering = axes[self.js_steering]
-            now = time.monotonic()
-            #
-            # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
-            if (now - self.last_i2c_time >= self.min_interval and
-                    (velocity != self.last_velocity or steering != self.last_steering)):
-                self.last_i2c_time = now
-                self.last_velocity = velocity
-                self.last_steering = steering
-                self.esp32client.write_servo(
-                    steering=steering,
-                    velocity=velocity
-                )
-        else:
-            self.logger.warn("AUTO-MODE noch nicht implementiert")
+        # if self.MODE == "MANUAL":
+        #     velocity = axes[self.js_velocity]
+        #     steering = axes[self.js_steering]
+        #     now = time.monotonic()
+        #     #
+        #     # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
+        #     if (now - self.last_i2c_time >= self.min_interval and
+        #             (velocity != self.last_velocity or steering != self.last_steering)):
+        #         self.last_i2c_time = now
+        #         self.last_velocity = velocity
+        #         self.last_steering = steering
+        #         self.esp32client.write_servo(
+        #             steering=steering,
+        #             velocity=velocity
+        #         )
+        # else:
+        #     self.get_logger().warn("AUTO-MODE noch nicht implementiert")
 
 
 def main(args=None):

@@ -8,6 +8,7 @@ driver_controller_node:
     cmd_vel_topic: "/joy"
     reverse_steering: false
     reverse_velocity: false
+    service_wait_timeout: 10.0
     # Joystick mappings
     # LJ_LR = 0, LJ_UD = 1
     # RJ_LR = 2, RJ_UD = 3

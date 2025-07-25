@@ -27,3 +27,9 @@ class ServiceNotAvailableException(RoverException):
     """Ein geforderter Service oder der ServiceChannel ist nicht verfügbar"""
     def __init__(self, service: str):
         super().__init__(f"Service / Service-Channel {service} nicht verfügbar")
+
+
+class NodeNotAvailableException(RoverException):
+    """Ein geforderter Service oder der ServiceChannel ist nicht verfügbar"""
+    def __init__(self, service: str):
+        super().__init__(f"Service / Service-Channel {service} nicht verfügbar")

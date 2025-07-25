@@ -1,11 +1,16 @@
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode
+from lifecycle_msgs.msg import State as LifecycleState
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.executors import MultiThreadedExecutor
+from lifecycle_msgs.srv import GetState
 from geometry_msgs.msg import Twist
+from rclpy.parameter import Parameter
+import random
+
 from sensor_msgs.msg import Joy
 from enum import Enum
 import time  # am Anfang ergänzen
-from rclpy.parameter import Parameter
-#from .hardware.rover_driver import RoverDriver
 from rover_interfaces.msg import I2CWrite
 from rover_interfaces.msg import LEDMessage
 from rover_interfaces.srv import I2CESP32Communication
@@ -13,7 +18,11 @@ from .control.led_pattern import LEDPattern
 from .control.ESP32Client import ESP32Client
 from .control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS
 from .control.utilities import Utilities
+from .control.ros_utilities import *
+
 from .rover_exceptions import *
+import os
+
 
 class ESP32_PORTS(Enum):
     LED1=18
@@ -39,12 +48,22 @@ class JOYSTICKS(Enum):
     PAD_LR = 4     # JoyPad
     PAD_UD = 5      # JoyPad
 
-class DriverControllerNode(Node):
+class DriverControllerNode(LifecycleNode):
     """
     Der DriverControllNode steuert über den I2C_Node die Verbindung zum ESP indem er eine
     I2CESPCommunication Service-Nachricht versendet. Der Vorteil von Serivce-Nachrichten
     ist, das der ESP32 mit einem Response antwortet.
     Somit können auch Daten vom ESP32 empfangen werden
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+    BEACHTEN: 
+    in der Launch datei werden die Nodes mit dependencies gestartet
+    der driver_controller_node hat eine dependency zum i2c_node. Erst wenn dieser on_active() erfolgreich
+    durchlaufen hat, geht der driver_controller_node von inaktive auf active.
+    Hintergrund ist: dieses Node ist davon abhängig das der i2c_node den service /i2c/esp32command gestartet hat
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     Publish-Service-Message: (OUT)
     (Versenden von Steering/Velocity Nachrichten)
@@ -103,11 +122,10 @@ class DriverControllerNode(Node):
     
     """
 
-
     def __init__(self):
-
-        super().__init__('driver_controller_node')
         self.node_name = self.__class__.__name__
+        super().__init__(self.node_name)
+        self.pid = os.getpid()
 
         # Parameter deklarieren
         self.declare_parameter("log_level", "INFO")  # Default als Fallback
@@ -141,7 +159,11 @@ class DriverControllerNode(Node):
             ('map_js_velocity', 1),
             ('map_js_cam_turn', 2),
             ('map_js_cam_tilt', 3),
+            ('service_wait_timeout', 10.0),
+
+
         ])
+
 
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').get_parameter_value().string_value
         self.topic_battery = self.get_parameter('topic_battery').get_parameter_value().string_value
@@ -155,10 +177,13 @@ class DriverControllerNode(Node):
         self.map_js_velocity = self.get_parameter('map_js_velocity').get_parameter_value().integer_value
         self.map_js_cam_turn = self.get_parameter('map_js_cam_turn').get_parameter_value().integer_value
         self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
+        self.service_wait_timeout = self.get_parameter('service_wait_timeout').get_parameter_value().double_value
+
 
         self.get_logger().info(
         f"""
         DriverControllerNode(Node) config:\n\
+        PID:                    {self.pid}
         ---------------------------------------------------
         COMMON --------------------------------------------
         cmd_vel_topic:          {self.cmd_vel_topic}
@@ -174,25 +199,8 @@ class DriverControllerNode(Node):
         map_js_cam_turn:        {self.map_js_cam_turn}
         map_js_cam_tilt:        {self.map_js_cam_tilt}
         """)
-        
-        #self.get_logger().info(f"create publisher für I2CWrite")
-        #self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
-        self.get_logger().info(f"create publisher für LEDMessages")
-        self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
 
-        self.js_velocity = JOYSTICKS.LJ_UD.value
-        self.js_steering = JOYSTICKS.LJ_LR.value
 
-        #
-        # teleop-Topic abonnieren
-        self.cmd_vel_topic = self.cmd_vel_topic
-        self.get_logger().info(f"create subscription für JoyStick-Commands")
-        self.subscription = self.create_subscription(
-            Joy,
-            self.cmd_vel_topic,
-            self.cmd_driver_callback,
-            10
-        )
 
         self.last_velocity = None
         self.last_steering = None
@@ -203,19 +211,90 @@ class DriverControllerNode(Node):
         self.last_i2c_time = time.monotonic()
         self.min_interval = 0.05
 
+
+    def on_configure(self, state: State):
+        self.get_logger().info("🚀  on_configure wurde betreten")
+        self.get_logger().info(f'{self.node_name}: Konfiguriere...')
+        #return super().on_configure(state)
+
+
+        self.get_logger().info(f"\t📳 create publisher für I2CWrite")
+        self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
+        self.get_logger().info(f"\t📳 create publisher für LEDMessages")
+        self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
+
+
+        periode_s = 5.0
+        self.test_periodically_timer_active = False
+        self.get_logger().info(f"\t⏱️ create periodical GameController Messages")
+        self.create_timer(periode_s, self.test_periodically_send_service_messsage)
+
+        self.get_logger().info("✅ on_configure ready")
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State):
+        self.get_logger().info("🚀🚀  on_activate wurde betreten")
+
         try:
-            #
             #
             # der ESP32Client ist faktisch die Schnittstelle zwischen dem
             # driver_controller und dem I2CNode und versendet die Serivce-nachricht
-            self.get_logger().info('setup ESP32Client')
-            self.esp32client = ESP32Client(self, self.i2c_esp_command_srv)
-            self.get_logger().info('ESP32Client Objekt erhalten')
+            self.get_logger().info('\t📳 setup ESP32Client')
+            self.esp32client = ESP32Client( node=self, 
+                                            channel=self.i2c_esp_command_srv,
+                                            timeout=self.service_wait_timeout
+                                        )
+            self.get_logger().info('\t📳 ESP32Client Objekt erhalten')
+
+            #self.get_logger().info(f"create publisher für I2CWrite")
+            #self.publisher = self.create_publisher(I2CWrite, '/i2c/write', 10)
+            self.get_logger().info(f"\t🔴🟡🟢 create publisher für LEDMessages")
+            self.led_pub = self.create_publisher(LEDMessage, '/led', 10)
+
+            self.js_velocity = JOYSTICKS.LJ_UD.value
+            self.js_steering = JOYSTICKS.LJ_LR.value
+
+            #
+            # teleop-Topic abonnieren
+            self.cmd_vel_topic = self.cmd_vel_topic
+            self.get_logger().info(f"\t📳 create subscription für JoyStick-Commands")
+            self.subscription = self.create_subscription(
+                Joy,
+                self.cmd_vel_topic,
+                self.cmd_driver_callback,
+                10
+            )
+
+
         except RoverException as err:
             raise RoverException()
-        
-        self.get_logger().info('DriverControllerNode gestartet.')
 
+        self.get_logger().info("✅✅ on_activate ready")
+        #return super().on_activate(state)
+        self.test_periodically_timer_active = True
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_deactivate(self, state: State):
+
+        self.get_logger().info(f'🧼🧼🧼 on_deactivate()')
+        return super().on_deactivate(state)
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        try:
+            if rclpy.ok():
+                self.get_logger().info(f"🧼🧼🧼🧼 [{self.node_name}] on_shutdown")
+        except Exception as e:
+            self.get_logger().error(f'❌❌❌❌❌❌[{self.node_name}] Fehler in on_shutdown(): {e}❌❌❌❌❌❌')
+            import traceback
+            self.get_logger().error(traceback.format_exc())    
+
+        self.get_logger().info(f'[{self.node_name}] Shutdown erfolgreich abgeschlossen.')
+ 
+        self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
+        self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+ 
+        return super().on_shutdown(state)
+    
     def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
         """
         """
@@ -227,7 +306,8 @@ class DriverControllerNode(Node):
         msg.duration_off = duration_off
         msg.ledmask = ledmask
         self.led_pub.publish(msg)
-        self.get_logger().info(f"Published LEDMessage() '{msg}'")            
+        self.get_logger().info(f"🔴🟡🟢 Published LEDMessage() '{msg}'")            
+
 
     def cmd_driver_callback(self, msg: Joy):
         axes = msg.axes.tolist()
@@ -295,28 +375,62 @@ class DriverControllerNode(Node):
             self.last_axes = list(axes)
             self.last_buttons = list(buttons)
 
-        # if self.MODE == "MANUAL":
-        #     velocity = axes[self.js_velocity]
-        #     steering = axes[self.js_steering]
-        #     now = time.monotonic()
-        #     #
-        #     # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
-        #     if (now - self.last_i2c_time >= self.min_interval and
-        #             (velocity != self.last_velocity or steering != self.last_steering)):
-        #         self.last_i2c_time = now
-        #         self.last_velocity = velocity
-        #         self.last_steering = steering
-        #         self.esp32client.write_servo(
-        #             steering=steering,
-        #             velocity=velocity
-        #         )
-        # else:
-        #     self.get_logger().warn("AUTO-MODE noch nicht implementiert")
+        if self.MODE == "MANUAL":
+            #self.get_logger().info(f"MANUAL-MODE......")            
+            velocity = axes[self.js_velocity]
+            steering = axes[self.js_steering]
+            now = time.monotonic()
+            #
+            # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat
+            if (now - self.last_i2c_time >= self.min_interval and
+                    (velocity != self.last_velocity or steering != self.last_steering)):
+                self.last_i2c_time = now
+                self.last_velocity = velocity
+                self.last_steering = steering
+                self.get_logger().debug(f"[cmd_driver_callback] WRITE_SERVO {steering:.5f} | {velocity:.5f}")
+                self.esp32client.write_servo(
+                        steering=steering,
+                        velocity=velocity
+                )
+                self.get_logger().debug(f"successfully send to service")
 
+        else:
+            self.get_logger().warn("AUTO-MODE noch nicht implementiert")
+
+    def test_periodically_send_service_messsage(self):
+        """
+        NUR ZUM TEST
+        sende periodisch über /i2c/esp32_command eine Nachricht und simulliert
+        einen GameController Eingabe
+        """
+        if not self.test_periodically_timer_active :
+            return 
+        steering = Utilities.random_step_value(-1.0, 1.0, 5, 5)
+        velocity = Utilities.random_step_value(-1.0, 1.0, 5, 5)
+        self.get_logger().debug(f"➡️ TEST GameController :  {steering:.5f} | {velocity:.5f}")
+        self.esp32client.write_servo(
+                steering=steering,
+                velocity=velocity
+        )
 
 def main(args=None):
     rclpy.init(args=args)
     node = DriverControllerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()     
+
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+
+    try:
+        rclpy.spin(node, executor=executor)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.get_logger().info("Node wird beendet...")
+        node.destroy_node()
+        # ⚠️ Shutdown nur, wenn Kontext nicht schon heruntergefahren!
+        if rclpy.ok():
+            rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+

@@ -18,6 +18,10 @@ import struct
 import os
 import asyncio
 import threading
+
+#from rover.hardware.i2c_driver import ESP32RawDriver, ServoDriver, DIGITALPINS
+#from .hardware.rover_driver import RoverDriver
+#from .hardware.i2c_driver import CommandID, SubCommandID, ESP32PINS
 import time
 
 """
@@ -116,6 +120,9 @@ class I2CNode(LifecycleNode):
         self.acs712_sensitivity = self.get_parameter('acs712_sensitivity').get_parameter_value().double_value
         self.acs712_on_channel = self.get_parameter('acs712_on_channel').get_parameter_value().integer_value
 
+
+        #self.esp_driver = ESP32RawDriver(self.get_logger())
+        #self.servo_driver = ServoDriver(self.get_logger())
         self.timer = None
 
         self.get_logger().info(
@@ -140,21 +147,41 @@ class I2CNode(LifecycleNode):
         I2C-ADS-RAISE-ERR:          {self.i2c_ads_raise_onerror}
         I2C-ADS-SAMPLE-RATE-HZ      {self.ads1115_sample_rate_hz}
         """)
+ 
+        state_service_name = f"{self.get_name()}/get_state"
+        self.get_logger().info(f"[{self.node_name}] Create self.get_state_srv(): '{state_service_name}'")
+        self.get_state_srv = self.create_service(
+            GetState,
+            state_service_name,
+            self.get_state_cb
+        )
 
         self._current_state = LifecycleState.PRIMARY_STATE_UNCONFIGURED
         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
 
 
+    # def get_state_cb(self, request, response):
+    #     state_id = self._current_state
+    #     response.current_state.id = state_id
+    #     response.current_state.label = LIFECYCLE_STATE_LABELS.get(state_id, "unknown")
+    #     return response
+
+    def get_state_cb(self, request, response):
+        self.get_logger().info(f"[get_state_cb] current_state={self._current_state}")
+        state_id = self._current_state  # z. B. ein int
+        state_label = LIFECYCLE_STATE_LABELS.get(state_id, "unknown")
+
+        response.current_state = LifecycleState(id=state_id, label=state_label)
+
+        return response
+
     def on_configure(self, state: State):
         # Subscriber für WRITE-Befehle
-        self.get_logger().info("🚀 on_configure wurde betreten")
         try:
-
-
             #
             # Subscription Möglichkeit 1
-            self.get_logger().info(f'\t🔧Topic Subscribe {self.i2c_write_topic}')
-            self.esp32_write_subscription = self.create_subscription(
+            self.get_logger().info(f'Topic Subscribe {self.i2c_write_topic}')
+            self.create_subscription(
                 I2CWrite,                       # Message Type
                 self.i2c_write_topic,           # Topic-Name
                 self.handle_write_msg,          # callback funktion
@@ -163,63 +190,62 @@ class I2CNode(LifecycleNode):
 
             #
             # Subscription Möglichkeit 2
-            self.get_logger().info(f'\t🔧 Topic Subscribe {self.i2c_read_topic}')
-            self.esp32_read_subscription = self.create_subscription(
-                I2CRead, 
+            self.get_logger().info(f'Topic Subscribe {self.i2c_read_topic}')
+            self.create_subscription(
+                I2CWrite, 
                 self.i2c_read_topic, 
-                self.handle_read_msg, 
-                10
-            )
+                self.handle_read_msg, 10)
 
             # Möglichkeit 3
-            # Service für READ-Anfragen Mögichkeit 3
-            self.get_logger().info(f'\t📡 Service Create {self.i2c_esp_command_srv}')
-            self.esp32_communication_service = self.create_service(
+            # Service für READ-Anfragen Mögichkeit 2
+            self.get_logger().info(f'Service Create {self.i2c_esp_command_srv}')
+            self.create_service(
                 I2CESP32Communication,          # Serivce Protokoll-Type
                 self.i2c_esp_command_srv,       # Service Protokoll
                 self.handle_esp32_command       # callback
             )
 
-            # # Möglichkeit 4
-            # # Service für READ-Anfragen Mögichkeit 4
-            self.get_logger().info(f'\t📡 Service Create {self.i2c_request_request_srv}')
-            self.esp32_read_service = self.create_service(
+            # Möglichkeit 4
+            # Service für READ-Anfragen Mögichkeit 2
+            self.get_logger().info(f'Service Create {self.i2c_request_request_srv}')
+            self.create_service(
                 I2CReadRequest,                 # Serivce Protokoll-Type
                 self.i2c_request_request_srv,   # Service Protokoll
                 self.handle_request_response    # callback
             )
 
-            # #
-            # # Instanzierung des I2C-Busses
+            #
+            # Instanzierung des I2C-Busses
             self.bus = I2CBus.getBus(self.i2c_bus_id)
-            self.get_logger().info(f"\tI2C-Bus Instanz {self.bus}")
+            self.get_logger().info(f"I2C-Bus Instanz {self.bus}")
 
-            # #
-            # # ADS1115Driver nutzen
+            #
+            # ADS1115Driver nutzen
             self.ads = ADS1115Driver(
                 bus=self.bus, 
                 logger=self.get_logger(),
                 slave_address=self.i2c_ads_addr, 
                 gain=0
             )
-            self.get_logger().info(f"\t🔋 ADS1115Driver {self.ads} ready")
+            self.get_logger().info(f"ADS1115Driver {self.ads} ready")
 
-            # #
-            # # Strom-Messer am ADS1115 
+            #
+            # Strom-Messer am ADS1115 
             self.acs712 = ACS712Driver(
                 ads_driver=self.ads,
                 channel=self.acs712_on_channel,
                 zero_offset=self.acs712_zero_offset,
                 sensitivity=self.acs712_sensitivity
             )
-            self.get_logger().info(f"\t🔋 ACS712Driver {self.acs712} ready")
+            self.get_logger().info(f"ACS712Driver {self.acs712} ready")
+ 
  
             self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
-            self.get_logger().info(f"\t[{self.node_name}] Konfiguration durchgeführt....")
-            self.get_logger().info(f"\t[{self.node_name}]  Node wechselt in '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
-  
-            #return super().on_configure(state)
-            self.get_logger().info("✅ on_configure ready")
+            self.get_logger().info(f"[{self.node_name}] Konfiguration durchgeführt....")
+            self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+ 
+            self.is_active = False  # wird genutzt um abzuwarten das der LifeCycleNode wirklich "online" ist. Erst dann wird die Variable True
+ 
             return TransitionCallbackReturn.SUCCESS
 
         except Exception as e:
@@ -228,34 +254,45 @@ class I2CNode(LifecycleNode):
             self.get_logger().error(traceback.format_exc())            
             return TransitionCallbackReturn.FAILURE
 
+    # def on_activate(self, state):
+    #     self.get_logger().info("on_activate() gestartet")
+    #     self._current_state = 3  # active
+    #     self.get_logger().info("on_activate() abgeschlossen")
+    #     return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state):
-        self.get_logger().info("🚀🚀 on_activate wurde betreten")
         self._current_state = State.PRIMARY_STATE_ACTIVE
-        self.get_logger().info(f"\ton_activate() gestartet. Node wechselt in '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+        self.get_logger().info(f"on_activate() gestartet. State: '{self._current_state}'")
 
-        self._ping_devices()
-        self._start_publishers()
+        # Starte Initialisierung in eigenem Thread – blockiert Activation nicht
+        thread = threading.Thread(target=self._start_after_activation, daemon=True)
+        thread.start()
 
-        self.get_logger().info("✅✅ on_activate ready")
         return TransitionCallbackReturn.SUCCESS
-    
-        #return super().on_activate(state)
+
+    def _start_after_activation(self):
+        self.get_logger().info("[I2CNode] Starte nach Activation…")
+
+        try:
+            self._ping_devices()
+            self._start_publishers()
+        except Exception as e:
+            self.get_logger().error(f"[I2CNode] Fehler beim Start nach Aktivierung: {e}")
 
     def _ping_devices(self):
-        self.get_logger().info("\t🔧 - PING I2C devices.....")
+        self.get_logger().info("PING I2C devices.....")
         try:
-            self.get_logger().info(f'\t\tPing to ESP32...()')
+            self.get_logger().info(f'Ping to ESP32...()')
             self.esp_ready = I2CBus.pingSlave(self.i2c_bus_id, self.i2c_esp_addr)
             if self.esp_ready == False:
                 if self.i2c_esp32_raise_onerror:
-                    raise IOError(f"\t\tEPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
+                    raise IOError(f"EPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
                 else:
-                    self.get_logger().warn(f"\t\tEPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
+                    self.get_logger().warn(f"\tEPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
             else:
-                self.get_logger().info(f'\t\tEPS32 erreichbar mit  {hex(self.i2c_esp_addr)}')
+                self.get_logger().info(f'\tEPS32 erreichbar mit  {hex(self.i2c_esp_addr)}')
             
-            self.get_logger().info(f'\tPing to ADS1115...()')
+            self.get_logger().info(f'Ping to ADS1115...()')
             self.ads_ready = I2CBus.pingSlave(self.i2c_bus_id, self.i2c_ads_addr)
             if self.ads_ready == False:
                 if self.i2c_ads_raise_onerror:
@@ -272,20 +309,23 @@ class I2CNode(LifecycleNode):
 
 
     def _start_publishers(self):
-        self.get_logger().info("\t🔧 - Start Publisher.....")
+        self.get_logger().info("Start Publisher.....")
         try:
             #
             # BatteryPublisher konfigurieren
-            self.ads1115_period_s = 1.0 / self.ads1115_sample_rate_hz
-            self.get_logger().info(f'\t\tADS1115 Publisher alle {self.ads1115_period_s:.3f} Sekunden → Topic: {self.i2c_ads_raw_topic}')
+            self.ads1115_sample_rate_ms = 1 / self.ads1115_sample_rate_hz
+            self.get_logger().info(f'ADS1115 Publisher {(self.ads1115_sample_rate_ms/1000)}ms in {self.i2c_ads_raw_topic}')
             self.pub_batt = self.create_publisher(BatteryRaw, self.i2c_ads_raw_topic, 10)
-            self.create_timer(self.ads1115_period_s, self.read_ads1115_periodically)
+            self.create_timer(self.ads1115_sample_rate_ms, self.read_ads1115_periodically)
 
             #
             # IMU Publisher konfigurieren
 
             #
             # OTHER Publisher konfigurieren
+
+
+            self.is_active = True
             
         except Exception as e:
             self.get_logger().error(f'[{self.node_name}] Fehler in _start_publishers(): {e}')
@@ -293,8 +333,61 @@ class I2CNode(LifecycleNode):
             self.get_logger().error(traceback.format_exc())  
             return TransitionCallbackReturn.FAILURE
 
+    # def on_activate(self, state: State):
+    #     self.get_logger().info(f'on_activate() - started')
+    #     self.periodic_timer = None
+    #     try:
+    #         self.get_logger().info(f'Ping to ESP32...()')
+    #         self.esp_ready = I2CBus.pingSlave(self.i2c_bus_id, self.i2c_esp_addr)
+    #         if self.esp_ready == False:
+    #             if self.i2c_esp32_raise_onerror:
+    #                 raise IOError(f"EPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
+    #             else:
+    #                 self.get_logger().warn(f"\tEPS32 nicht erreichbar mit {hex(self.i2c_esp_addr)}")
+    #         else:
+    #             self.get_logger().info(f'\tEPS32 erreichbar mit  {hex(self.i2c_esp_addr)}')
+            
+    #         self.get_logger().info(f'Ping to ADS1115...()')
+    #         self.ads_ready = I2CBus.pingSlave(self.i2c_bus_id, self.i2c_ads_addr)
+    #         if self.ads_ready == False:
+    #             if self.i2c_ads_raise_onerror:
+    #                 raise IOError(f"ADS1115 nicht erreichbar mit {hex(self.i2c_ads_addr)}")
+    #             else:
+    #                 self.get_logger().warn(f"\tåADS1115 nicht erreichbar mit {hex(self.i2c_ads_addr)}")
+    #         else:
+    #             self.get_logger().info(f'\tADS1115 erreichbar mit  {hex(self.i2c_ads_addr)}')
+
+ 
+    #         self._current_state = LifecycleState.PRIMARY_STATE_ACTIVE
+    #         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+ 
+    #         #
+    #         # BatteryPublisher konfigurieren
+    #         self.ads1115_sample_rate_ms = 1 / self.ads1115_sample_rate_hz
+    #         self.get_logger().info(f'ADS1115 Publisher {(self.ads1115_sample_rate_ms/1000)}ms in {self.i2c_ads_raw_topic}')
+    #         self.pub_batt = self.create_publisher(BatteryRaw, self.i2c_ads_raw_topic, 10)
+    #         self.create_timer(self.ads1115_sample_rate_ms, self.read_ads1115_periodically)
+
+    #         #
+    #         # IMU Publisher konfigurieren
+
+    #         #
+    #         # OTHER Publisher konfigurieren
+
+    #         self.is_active = True
+
+
+    #     except Exception as e:
+    #         self.get_logger().error(f'[{self.node_name}] Fehler in on_activate(): {e}')
+    #         import traceback
+    #         self.get_logger().error(traceback.format_exc())  
+    #         return TransitionCallbackReturn.FAILURE
+    #     self.get_logger().info(f'[{self.node_name}]  erfolgreich aktiviert. State: {LIFECYCLE_STATE_LABELS[self._current_state]}')
+
+    #     return TransitionCallbackReturn.SUCCESS
+
     def on_deactivate(self, state: State):
-        self.get_logger().info(f'🧼🧼🧼 on_deactivate()')
+        self.get_logger().info(f'on_deactivate()')
         try:
             if self.timer is not None:
                 self.timer.cancel()
@@ -316,7 +409,7 @@ class I2CNode(LifecycleNode):
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         try:
             if rclpy.ok():
-                self.get_logger().info(f"🧼🧼🧼🧼 [{self.node_name}] on_shutdown")
+                self.get_logger().info(f"[{self.node_name}] on_shutdown")
         except Exception as e:
             self.get_logger().error(f'[{self.node_name}] Fehler in on_shutdown(): {e}')
             import traceback
@@ -327,36 +420,42 @@ class I2CNode(LifecycleNode):
         self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
  
-        return super().on_shutdown(state)
+        return TransitionCallbackReturn.SUCCESS
+
+    def handle_get_state(self, request, response):
+        self.get_logger().info("[handle_get_state] wird aufgerufen")
 
     def handle_write_msg(self, msg: I2CWrite):
         """
         Verarbeitet eine WRITE-Anforderung an einen I2C-Slave
         """
-
-        if msg.command == CommandID.DIGITAL_WRITE:
-            self.esp_driver.digitalWrite(msg.pins, msg.states)
-            self.get_logger().debug(f"[{self.node_name}] digital_write => {msg.pins}::{msg.states}")
-        elif msg.command == CommandID.SERVO_WRITE:
-            #
-            # beachten: die parameter reverse_velocity und reverse_steeoring
-            # wurden schon vom driver_controller_node in den beide data-werten
-            # verrechnet.
-            self.rover_driver.set_steeringAndVelocity(
-                steering=msg.data[0],
-                velocity=msg.data[1]
-            )
-        else:
-            self.get_logger().warn(f"Unbekannter Befehl: {msg.command}")
+        if not self.is_active:
+            self.get_logger().warn(f"[handle_write_msg] noch nicht aktiviert.... warten ....")
+            return
+        
+        # if msg.command == CommandID.DIGITAL_WRITE:
+        #     self.esp_driver.digitalWrite(msg.pins, msg.states)
+        #     self.get_logger().debug(f"[{self.node_name}] digital_write => {msg.pins}::{msg.states}")
+        # elif msg.command == CommandID.SERVO_WRITE:
+        #     #
+        #     # beachten: die parameter reverse_velocity und reverse_steeoring
+        #     # wurden schon vom driver_controller_node in den beide data-werten
+        #     # verrechnet.
+        #     self.rover_driver.set_steeringAndVelocity(
+        #         steering=msg.data[0],
+        #         velocity=msg.data[1]
+        #     )
+        # else:
+        #     self.get_logger().warn(f"Unbekannter Befehl: {msg.command}")
         pass
 
     def handle_read_msg(self, msg: I2CRead):
         """ 
         Verarbeitet eine READ-Anforderung an einen I2C-Slave
         """
-        # if not self.is_active:
-        #     self.get_logger().warn(f"[handle_read_msg] noch nicht aktiviert.... warten ....")
-        #     return
+        if not self.is_active:
+            self.get_logger().warn(f"[handle_read_msg] noch nicht aktiviert.... warten ....")
+            return
         pass
 
     def handle_esp32_command(self, request, response):
@@ -367,42 +466,50 @@ class I2CNode(LifecycleNode):
 
         __send_esp32_packet() senden tatsächlich die Daten
         """
-        self.get_logger().debug(f"📡 handle_esp32_command incomming-message...")
+        if not self.is_active:
+            self.get_logger().warn("[handle_esp32_command] abgelehnt: noch nicht aktiviert")
+            try:
+                response.fvalues = []
+                response.ivalues = [SERVICE_RESPONSE.ROS_SERVICE_NOT_AVAILABEL.value]
+            except Exception as e:
+                self.get_logger().error(f"Fehler beim Setzen der Serviceantwort: {e}")
+            return response
+
         if request.device != "ESP32":
-            self.get_logger().warn(f"Unbekanntes Zielgerät: ❗❗ '{request.device}'❗❗")
+            self.get_logger().warn("Unbekanntes Zielgerät: " + request.device)
             response.ivalues = [-2]  # Fehlercode
             return response
         try:
-            self.get_logger().info(f"📡 handle_esp32_command '{request}'")
+            #self.get_logger().info(f"--S1")
             if request.command == CommandID.SERVO_WRITE.value:
                 if request.subcommand == SubCommandID.SCMD_SERVO_SPEED_POSITION.value:
+                    #self.get_logger().info(f"--S2")
                     steering = request.fvalues[0]
                     velocity = request.fvalues[1]
                     steering = Utilities.clamp(steering, -1.0, +1.0)
                     velocity = Utilities.clamp(velocity, -1.0, +1.0)
+                    #self.get_logger().info(f"--S3")
                     #
                     # Die Float-Daten müssen umgewandelt werden in einen
                     # Wertebereich von 0-65535
                     data = self.__dataModulo(request.fvalues, factor=100)
-                    response.ivalues = [0,0,0,0,0]
-                    response.fvalues = []
                     return self.__send_esp32_packet(
-                         slave_address=self.i2c_esp_addr,
-                         cmd=request.command,
-                         scmd=request.subcommand,
-                         data_vals = data,
-                         response=response
+                        slave_address=self.i2c_esp_addr,
+                        cmd=request.command,
+                        scmd=request.subcommand,
+                        data_vals = data,
+                        response=response
                     )
                 else:
-                    self.get_logger().warn(f"ESP32-SubCommand '🔴 {request.subcommand}' unbekannt 🔴")
-                    response.ivalues = [ESP32_RESPONSE.UNKNOWN_SCMD.value]    
+                    self.get_logger().warn(f"ESP32-SubCommand '{request.subcommand.value}' unbekannt")
+                    response.ivalues = [ESP32_RESPONSE.UNKNOWN_SCMD]    
             else:
-                self.get_logger().warn(f"ESP32-Command '⚠️⚠️ {request.command}' noch nicht implementiert ⚠️⚠️")
-                response.ivalues = [ESP32_RESPONSE.UNKNOWN_CMD.value]    
+                self.get_logger().warn(f"ESP32-Command '{request.command.value}' unbekannt")
+                response.ivalues = [ESP32_RESPONSE.UNKNOWN_CMD]    
 
         except Exception as e:
-            self.get_logger().error(f"❌❌❌❌❌❌ I2C-Fehler :{e} ❌❌❌❌❌❌")
-            response.ivalues[0] = SERVICE_RESPONSE.I2C_ERROR.value
+            self.get_logger().error(f"I2C-Fehler :{e}")
+            response.ivalues[0] = SERVICE_RESPONSE.I2C_ERROR
 
         return response
 
@@ -411,15 +518,18 @@ class I2CNode(LifecycleNode):
         Verarbeitet allgemeinen Datenaustausch mit einem I2C-Slave und erwartet ein Response zurück
 
         """
-        # if not self.is_active:
-        #     self.get_logger().warn(f"[handle_request_response] noch nicht aktiviert.... warten ....")
-        #     return
+        if not self.is_active:
+            self.get_logger().warn(f"[handle_request_response] noch nicht aktiviert.... warten ....")
+            return
         pass
 
     def read_ads1115_periodically(self):
         """ 
             Periodisches Lesen des ADS1115. 
         """
+        if not self.is_active:
+            self.get_logger().warn(f"I2C_node noch nicht aktiviert.... warten ....")
+            return
         try:
             msg = BatteryRaw()
             msg.channel_0 = round(self.ads.scaled_voltage(0, 25.0, 5.0),3)
@@ -439,7 +549,6 @@ class I2CNode(LifecycleNode):
         """
         Versenden jetzt tatsächliche ein Datenpaket an den ESP32
         """
-
         data_vals = data_vals[:5] + [0] * (5 - len(data_vals))
         header = 0xFEEF
     
@@ -463,11 +572,9 @@ class I2CNode(LifecycleNode):
             self.bus.write_i2c_block_data(slave_address, 0x00, packet_list)
             self.get_logger().debug(f"[__send_esp32_packet] : {packet_list}")
             self.get_logger().info(f"[__send_esp32_packet] write_i2c_block_data done")
-            response.ivalues = [0]
-            response.fvalues = []
         except Exception as e:
             self.get_logger().error(f"I2C-Error: {e}")
-            response.ivalues = [SERVICE_RESPONSE.I2C_ERROR.value]
+            response.ivalues = [SERVICE_RESPONSE.I2C_ERROR]
 
         return response            
 
@@ -499,8 +606,8 @@ def main(args=None):
     executor.add_node(node)
 
     try:
-        executor.spin()
-        #rclpy.spin(node, executor=executor)
+        #executor.spin()
+        rclpy.spin(node, executor=executor)
     except KeyboardInterrupt:
         pass
     finally:

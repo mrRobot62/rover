@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>emojis_log.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<table>
+<thead>
+<tr>
+<th>Emoji</th>
+<th>Bedeutung</th>
+<th>Typischer Einsatz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>✅</td>
+<td>Erfolg</td>
+<td>&quot;✅ Verbindung aufgebaut&quot;</td>
+</tr>
+<tr>
+<td>❌</td>
+<td>Fehler</td>
+<td>&quot;❌ Sensorfehler&quot;</td>
+</tr>
+<tr>
+<td>⚠️</td>
+<td>Warnung</td>
+<td>&quot;⚠️ Geschwindigkeit überschreitet Grenzwert&quot;</td>
+</tr>
+<tr>
+<td>ℹ️</td>
+<td>Info</td>
+<td>&quot;ℹ️ Starte Kalibrierung&quot;</td>
+</tr>
+<tr>
+<td>🚀</td>
+<td>Start</td>
+<td>&quot;🚀 Starte Mission&quot;</td>
+</tr>
+<tr>
+<td>🔄</td>
+<td>Wiederholen / Retry</td>
+<td>&quot;🔄 Versuche erneut...&quot;</td>
+</tr>
+<tr>
+<td>🔧</td>
+<td>Konfiguration</td>
+<td>&quot;🔧 Setze Motorparameter&quot;</td>
+</tr>
+<tr>
+<td>⏳</td>
+<td>Warten / Verzögerung</td>
+<td>&quot;⏳ Warte auf GPS-Fix&quot;</td>
+</tr>
+<tr>
+<td>📡</td>
+<td>Netzwerk</td>
+<td>&quot;📡 Sende Telemetrie&quot;</td>
+</tr>
+<tr>
+<td>💤</td>
+<td>Inaktivität</td>
+<td>&quot;💤 Keine Bewegung erkannt&quot;</td>
+</tr>
+<tr>
+<td>💥</td>
+<td>Crash / schwerer Fehler</td>
+<td>&quot;💥 Hindernis getroffen&quot;</td>
+</tr>
+<tr>
+<td>🔥</td>
+<td>Überhitzung / Last</td>
+<td>&quot;🔥 CPU &gt; 85 °C&quot;</td>
+</tr>
+<tr>
+<td>📦</td>
+<td>Paket</td>
+<td>&quot;📦 Daten empfangen&quot;</td>
+</tr>
+<tr>
+<td>📁</td>
+<td>Dateioperation</td>
+<td>&quot;📁 Lade Konfiguration&quot;</td>
+</tr>
+<tr>
+<td>🧪</td>
+<td>Test / Diagnostik</td>
+<td>&quot;🧪 Führe Test durch&quot;</td>
+</tr>
+<tr>
+<td>🧭</td>
+<td>Navigation / Richtung</td>
+<td>&quot;🧭 Ziel gesetzt&quot;</td>
+</tr>
+<tr>
+<td>🛠️</td>
+<td>Wartung</td>
+<td>&quot;🛠️ Initialisiere Systemwartung&quot;</td>
+</tr>
+<tr>
+<td>🔍</td>
+<td>Scanning / Untersuchung</td>
+<td>&quot;🔍 Umgebungsscanner aktiv&quot;</td>
+</tr>
+<tr>
+<td>📈</td>
+<td>Statistik / Verlauf</td>
+<td>&quot;📈 Geschwindigkeit: 0.9 m/s&quot;</td>
+</tr>
+<tr>
+<td>📤</td>
+<td>Upload / Senden</td>
+<td>&quot;📤 Sende an Server&quot;</td>
+</tr>
+<tr>
+<td>📥</td>
+<td>Download / Empfangen</td>
+<td>&quot;📥 Empfange Konfiguration&quot;</td>
+</tr>
+<tr>
+<td>🧵</td>
+<td>Thread / Prozess</td>
+<td>&quot;🧵 Starte Watchdog&quot;</td>
+</tr>
+<tr>
+<td>🧠</td>
+<td>KI / Objekterkennung</td>
+<td>&quot;🧠 Erkenne Objekt&quot;</td>
+</tr>
+<tr>
+<td>👁️</td>
+<td>Kamera / Vision</td>
+<td>&quot;👁️ Kamera aktiv&quot;</td>
+</tr>
+<tr>
+<td>🛰️</td>
+<td>GPS / Lokalisierung</td>
+<td>&quot;🛰️ GPS-Signal vorhanden&quot;</td>
+</tr>
+<tr>
+<td>🛑</td>
+<td>Not-Aus / Stop</td>
+<td>&quot;🛑 Not-Aus aktiviert&quot;</td>
+</tr>
+<tr>
+<td>🧱</td>
+<td>Blockade / Hindernis</td>
+<td>&quot;🧱 Fahrweg blockiert&quot;</td>
+</tr>
+<tr>
+<td>🧊</td>
+<td>Eingefroren / hängt</td>
+<td>&quot;🧊 Lidar reagiert nicht&quot;</td>
+</tr>
+<tr>
+<td>🦾</td>
+<td>Aktorik</td>
+<td>&quot;🦾 Greifarm aktiv&quot;</td>
+</tr>
+<tr>
+<td>🔋</td>
+<td>Batterie / Ladung</td>
+<td>&quot;🔋 Ladestand: 72%&quot;</td>
+</tr>
+<tr>
+<td>🧼</td>
+<td>Reset</td>
+<td>&quot;🧼 Werkseinstellungen geladen&quot;</td>
+</tr>
+<tr>
+<td>🎯</td>
+<td>Ziel erreicht / erkannt</td>
+<td>&quot;🎯 Ziel erreicht&quot;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="%F0%9F%94%81-richtungs-pfeile">🔁 Richtungs-Pfeile</h3>
+<table>
+<thead>
+<tr>
+<th>Emoji</th>
+<th>Bedeutung</th>
+<th>Typischer Einsatz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>⬆️</td>
+<td>Oben</td>
+<td>&quot;⬆️ Vorwärtsbewegung&quot;</td>
+</tr>
+<tr>
+<td>⬇️</td>
+<td>Unten</td>
+<td>&quot;⬇️ Rückwärtsfahrt&quot;</td>
+</tr>
+<tr>
+<td>⬅️</td>
+<td>Links</td>
+<td>&quot;⬅️ Kurve nach links&quot;</td>
+</tr>
+<tr>
+<td>➡️</td>
+<td>Rechts</td>
+<td>&quot;➡️ Kurve nach rechts&quot;</td>
+</tr>
+<tr>
+<td>↗️</td>
+<td>Diagonal oben rechts</td>
+<td>&quot;↗️ Ausweichmanöver nach vorn rechts&quot;</td>
+</tr>
+<tr>
+<td>↘️</td>
+<td>Diagonal unten rechts</td>
+<td>&quot;↘️ Rückzug rechts&quot;</td>
+</tr>
+<tr>
+<td>↙️</td>
+<td>Diagonal unten links</td>
+<td>&quot;↙️ Rückzug links&quot;</td>
+</tr>
+<tr>
+<td>↖️</td>
+<td>Diagonal oben links</td>
+<td>&quot;↖️ Drehe links oben weg&quot;</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="%F0%9F%94%86-led-statusfarben-ersatzweise-mit-farbpunkten">🔆 LED-Statusfarben (Ersatzweise mit Farbpunkten)</h3>
+<blockquote>
+<p>Emojis für &quot;echte&quot; LEDs gibt es nicht – wir nutzen stattdessen farbige Punkte:</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Emoji</th>
+<th>Bedeutung</th>
+<th>Typischer Einsatz</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔴</td>
+<td>LED rot</td>
+<td>&quot;🔴 Fehlerstatus aktiv&quot;</td>
+</tr>
+<tr>
+<td>🟡</td>
+<td>LED gelb</td>
+<td>&quot;🟡 Warnung: niedriger Batteriestand&quot;</td>
+</tr>
+<tr>
+<td>🟢</td>
+<td>LED grün</td>
+<td>&quot;🟢 System bereit&quot;</td>
+</tr>
+<tr>
+<td>🔵</td>
+<td>LED blau</td>
+<td>&quot;🔵 Bluetooth aktiviert&quot;</td>
+</tr>
+<tr>
+<td>⚫</td>
+<td>LED aus</td>
+<td>&quot;⚫ Standby-Modus&quot;</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h1 id="%F0%9F%A7%A0-systematische-emoji-tabelle-f%C3%BCr-ros-2-roboterprojekte">🧠 Systematische Emoji-Tabelle für ROS 2 Roboterprojekte</h1>
+<table>
+<thead>
+<tr>
+<th>Kategorie</th>
+<th>Beschreibung</th>
+<th style="text-align:center">Emoji</th>
+<th>Nutzungskontext</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Rechts</td>
+<td style="text-align:center">➡️</td>
+<td>Navigation, Bewegung, Kommandorichtung</td>
+</tr>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Links</td>
+<td style="text-align:center">⬅️</td>
+<td>Navigation, Rückwärtsbewegung</td>
+</tr>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Oben</td>
+<td style="text-align:center">⬆️</td>
+<td>Aufwärts, Elevator</td>
+</tr>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Unten</td>
+<td style="text-align:center">⬇️</td>
+<td>Absenken, Stoppen</td>
+</tr>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Rotierend rechts</td>
+<td style="text-align:center">🔁</td>
+<td>Loop, Wiederholung, Timer</td>
+</tr>
+<tr>
+<td>▶️ Pfeile</td>
+<td>Rotierend links</td>
+<td style="text-align:center">🔄</td>
+<td>Reset, Neustart</td>
+</tr>
+</tbody>
+</table>
+<p>| ⚠️ Status/Diagnose | Kritischer Fehler            | ❌    | Schwerer Fehler, Serviceausfall                     |
+| ⚠️ Status/Diagnose | Warnung                      | ⚠️    | Begrenzung, Temperatur, Spannung                    |
+| ⚠️ Status/Diagnose | OK                           | ✅    | Alles im grünen Bereich                             |
+| ⚠️ Status/Diagnose | Unbekannt                    | ❓    | Sensor- oder Kommunikationsfehler                   |
+| ⚠️ Status/Diagnose | Info                         | ℹ️    | Nicht-kritischer Hinweis                            |
+| ⚠️ Status/Diagnose | Wichtig                      | ❗    | Kritisch, muss beachtet werden                     |</p>
+<p>| 🧠 ROS 2/Nodes     | ROS 2 Logo (Symbolisch)      | 🤖    | Roboter, Node-Instanz                              |
+| 🧠 ROS 2/Nodes     | Lifecycle &quot;inactive&quot;         | ⚪     | Nicht konfiguriert                                  |
+| 🧠 ROS 2/Nodes     | Lifecycle &quot;configured&quot;       | 🟡    | Bereit zur Aktivierung                              |
+| 🧠 ROS 2/Nodes     | Lifecycle &quot;active&quot;           | 🟢    | Aktiv, funktionsbereit                              |</p>
+<p>| 🟢 Ampel/LED       | Rot                          | 🔴    | Störung, Fehler                                     |
+| 🟢 Ampel/LED       | Gelb                         | 🟡    | Warnung, &quot;warm-up&quot;                                  |
+| 🟢 Ampel/LED       | Grün                         | 🟢    | Alles OK, einsatzbereit                             |
+| 🟢 Ampel/LED       | Blau                         | 🔵    | Bluetooth, Netzwerkverbindung aktiv                 |
+| 🟢 Ampel/LED       | Grau/Weiß                    | ⚪     | LED aus, inaktiv                                    |</p>
+<p>| 🧭 Navigation      | GPS / Standort               | 🧭    | Positionsdaten, Navigation                          |
+| 🧭 Navigation      | Zielpunkt                    | 🎯    | Ziel erreicht, Waypoint                             |
+| 🧭 Navigation      | Startpunkt                   | 🏁    | Start, Pfadbeginn                                   |
+| 🧭 Navigation      | Karte/SLAM                   | 🗺️    | Mapping, SLAM Toolbox                               |</p>
+<p>| 🛠️ Hardware       | Sensor allgemein             | 🎛️    | Sensor-Platzhalter                                  |
+| 🛠️ Hardware       | Kamera                       | 📷    | Kamerastream, Bilddaten                             |
+| 🛠️ Hardware       | LiDAR                        | 📡    | LiDAR, RADAR                                        |
+| 🛠️ Hardware       | Temperatur                   | 🌡️    | Sensor-Status                                       |
+| 🛠️ Hardware       | Batterie                     | 🔋    | Ladezustand, Energielevel                           |
+| 🛠️ Hardware       | Motor                        | ⚙️    | Antrieb, Aktuator                                   |
+| 🛠️ Hardware       | Greifer/Servo                | ✋    | Manipulation, Greiferstatus                         |</p>
+<p>| 📶 Kommunikation   | WLAN                         | 📶    | Netzwerkstatus                                      |
+| 📶 Kommunikation   | Bluetooth                    | 📳    | Verbindung aktiv                                    |
+| 📶 Kommunikation   | Kein Signal                  | 📴    | Verbindungsfehler                                   |</p>
+<p>| 🧪 Simulation      | Gazebo                       | 🧪    | Simulationsumgebung                                |
+| 🧪 Simulation      | Testlauf                     | 🧫    | Unit Test, Debugging                               |</p>
+<p>| 🧰 Tools           | Terminal/Konsole             | 💻    | Logging, SSH, CLI                                  |
+| 🧰 Tools           | Code/Launch-Datei            | 📝    | Konfiguration, launch.yaml                          |
+| 🧰 Tools           | Datei                        | 📄    | Logfile, Datenfile                                  |
+| 🧰 Tools           | Uhr/Timer                    | ⏱️    | Zeitmessung, Frequenz                              |</p>
+<p>| 📦 Logistik        | Paket                        | 📦    | Aufgabe, Zielobjekt                                |
+| 📦 Logistik        | Roboterwagen                 | 🛺    | Mobiler Roboter, Lieferplattform                   |</p>
+<p>| 🧍‍♂️ Interaktion   | Mensch erkannt               | 🧍    | Objekterkennung (Human in loop)                    |
+| 🧍‍♂️ Interaktion   | Spracheingabe                | 🎙️    | Voice Control, HMI                                 |</p>
+
+</body>
+</html>

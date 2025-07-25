@@ -1,5 +1,6 @@
 import os
 import yaml
+import random
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -114,3 +115,18 @@ class Utilities:
             else:
                 print(f"[WARN] Konnte common topic '{key}' nicht laden: {e}")
             return default
+    @staticmethod    
+    def random_step_value(start=-1.0, end=+1.0, step_size=5, precise=5) -> float:
+        """ 
+        generiert FLOAT zufallszahl zwischen start und end, mit precise Nachkommastellen und 
+        einem Abstand von steep_size
+        """
+        precise = max(1, min(5, precise))
+        
+        step = (10 ** -precise) * step_size     # Schrittweite
+        num_steps = int((end - (start)) / step) + 1  # Anzahl möglicher Schritte
+        
+        random_index = random.randint(0, num_steps - 1)
+        value = start + random_index * step
+        
+        return round(value, precise)

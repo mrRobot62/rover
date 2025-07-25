@@ -87,3 +87,48 @@ class Ros2Delay:
     def is_running(self):
         """Gibt zurück, ob ein Delay läuft."""
         return self._timer is not None
+
+""""
+Beispiel zur Nutzung in einem LifeCycleNode
+
+class DelayedLifecycleNode(LifecycleNode):
+    def __init__(self):
+        super().__init__('delayed_node')
+        self.delay = None
+
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Konfiguriere...')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Aktiviere... starte Delay von 3 Sekunden.')
+
+        def after_delay():
+            self.get_logger().info('→ Verzögerung abgeschlossen, jetzt aktiv!')
+
+        self.delay = Ros2Delay(self, 3.0, after_delay)
+        self.delay.start()
+
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Deaktiviere...')
+        if self.delay:
+            self.delay.cancel()
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Cleanup...')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Shutdown...')
+        return TransitionCallbackReturn.SUCCESS
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DelayedLifecycleNode()
+    rclpy.spin(node)
+    rclpy.shutdown()
+""""

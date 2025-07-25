@@ -1,0 +1,459 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, LogInfo, GroupAction, IncludeLaunchDescription
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node, LifecycleNode
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
+from launch.conditions import IfCondition
+from launch.actions import OpaqueFunction
+from launch.substitutions import TextSubstitution
+from launch.actions import TimerAction
+from launch.event_handlers import OnShutdown
+from launch.actions import RegisterEventHandler, ExecuteProcess
+
+import launch.logging
+
+import os
+import yaml
+
+def load_rover_params(path: str, lidar_model:str):
+    with open(path,'r') as f:
+        data = yaml.safe_load(f)
+        return data.get(lidar_model, {}).get("ros__parameters", {})
+
+def generate_launch_description():
+    logger = launch.logging.get_logger('rover_launch')
+    logger.info("Starte rover_full.launch.py...")
+    # 📁 Paketverzeichnis
+    share_dir = get_package_share_directory('rover')
+    rviz_config_file = os.path.join(share_dir, 'config/rviz', 'rover.rviz')
+    urdf_config_file = os.path.join(share_dir, 'config/urdf', 'rover.urdf')
+    #params_file = os.path.join(share_dir, 'config', 'rover.yaml')
+    params_i2c_node = os.path.join(share_dir, 'config', 'i2c_node.yaml')
+    params_sensor_node = os.path.join(share_dir, 'config', 'sensor_node.yaml')
+    params_driver_controller_node = os.path.join(share_dir, 'config', 'driver_controller_node.yaml')
+    params_led_node = os.path.join(share_dir, 'config', 'led_node.yaml')
+    params_vision_node = os.path.join(share_dir, 'config', 'vision_node.yaml')
+    params_odom_node = os.path.join(share_dir, 'config', 'odom_node.yaml')
+    params_navigation_node = os.path.join(share_dir, 'config', 'navigation_node.yaml')
+    params_lidar = os.path.join(share_dir, 'config', 'lidar.yaml')
+    params_common = os.path.join(share_dir, 'config', 'rover_common.yaml')
+
+
+    # Liste der Lifecycle-Nodes (name, executable)
+    lifecycle_nodes = [
+        ('i2c_node', 'i2c_node', [], params_i2c_node),
+        ('driver_controller_node', 'driver_controller_node', ['i2c_node'], params_driver_controller_node),
+        ('sensor_node', 'sensor_node', ['i2c_node'], params_sensor_node),
+    ]
+
+    lidar_model_arg = DeclareLaunchArgument(
+        'lidar_model',
+        default_value='ydlidar',
+        description="Auswahl des Lidar-Models: ydlidar oder xv11"
+    )
+
+    rviz_load_arg = DeclareLaunchArgument(
+        'use_rviz',
+        default_value='true',
+        description='RViz starten oder nicht'
+    )
+
+    lidar_model = LaunchConfiguration('lidar_model')
+    lidar_topic = LaunchConfiguration('lidar_topic', default='/scan')
+
+    # sensor_node = LifecycleNode(
+    #     package='rover',
+    #     executable='sensor_node',
+    #     name='sensor_node',
+    #     output='screen',
+    #     namespace='/',
+    #     parameters=[
+    #         LaunchConfiguration('params_se'),
+    #         {'lidar_topic': lidar_topic}
+    #     ]
+    # )
+
+    # wird nur dann benötigt, wenn ich direkt ein Node erstellen möchte
+    #lidar_model = LaunchConfiguration('lidar_model')
+
+    #
+    # den Lidar basierend auf den Aufrufparameter kann nicht direkt genutzt und ausgewertet werden.
+    # daher hier ein Wrapper und später die OpaqueFunction()
+    #
+    def create_lidar_node(context):
+        model = context.launch_configurations['lidar_model']
+        params = load_rover_params(params_lidar, model)
+
+        nodes = []
+
+        if model == 'ydlidar':
+            logger.info("Create YDLidar Node -> [{params}]")
+            ydlidar_launch_file = params.get('ydlidar_launch', 'full_lidar.launch.py')
+            ydlidar_param_file = params.get('ydlidar_param', 'TminiPlus.yaml')
+
+            ydlidar_launch_path = os.path.join(
+                get_package_share_directory('ydlidar_ros2_driver'),
+                'launch',
+                ydlidar_launch_file
+            )
+
+            ydlidar_param_path = os.path.join(
+                get_package_share_directory('ydlidar_ros2_driver'),
+                'params', ydlidar_param_file
+            )
+
+            logger.info(f"[rover_launch] Model: {model}")
+            logger.info(f"[rover_launch] Launch: {ydlidar_launch_path}")
+            logger.info(f"[rover_launch] Param: {ydlidar_param_path}")
+
+            nodes.append(IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(ydlidar_launch_path),
+                launch_arguments={
+                    'params_lidar' : ydlidar_param_path
+                }.items()
+
+            ))
+
+        elif model == 'xv11':
+            logger.info("Create XV11Lidar Node -> [{params}]")
+            nodes.append(
+                Node(
+                    package='xv11_lidar_python',
+                    executable='xv11_lidar',
+                    name='xv11_lidar_node',
+                    output='screen',
+                    parameters=[params]
+                )
+            )
+
+        
+        return nodes
+
+    def create_nodes_from_arguments(context):
+        nodes = []
+        if LaunchConfiguration('use_rviz').perform(context) == 'true':
+            # 👀 RViz (optional)
+            nodes.append(
+                Node(
+                package='rviz2',
+                executable='rviz2',
+                name='rviz2',
+                condition=IfCondition(LaunchConfiguration('use_rviz')),
+                arguments=['-d', rviz_config_file],
+                output='screen'
+            ))
+
+        return nodes
+
+    # 🧾 Launch-Argumente
+    params_file_arg = DeclareLaunchArgument(
+        'params_common',
+        default_value=params_common,
+        description='Pfad zur Common-Parameterdatei des Rovers'
+    )
+
+    """
+    Transform-Node. Dieser Node Transformiert die Welt-Koordinaten auf base_link
+    Das wird benötigt um später z.b SLAM nutzen zu können
+
+    """
+    tf2_world_node = Node(package='tf2_ros',
+                    executable='static_transform_publisher',
+                    name='world_to_base_link',
+                    arguments=[
+                        '--x', '0.0',
+                        '--y', '0.0',
+                        '--z', '0.0',
+                        '--roll', '0.0',
+                        '--pitch', '0.0',
+                        '--yaw', '0.0',
+                        '--frame-id', 'world',
+                        '--child-frame-id', 'base_link',
+                    ],                    
+                    )
+
+    """
+    Transform-Node. Dieser Node Transformiert die Sensordaten aus dem Frame 'laser_frame' (siehe TminiPro.yaml) in base_link
+    base_link symbolisiert die physische Verortung des Sensors auf dem Roboter.
+
+    """
+    tf2_base_link_node = Node(package='tf2_ros',
+                    executable='static_transform_publisher',
+                    name='base_link_to_laser_frame',
+                    arguments=[
+                        '--x', '0.10',
+                        '--y', '0.0',
+                        '--z', '0.15',
+                        '--roll', '0.0',
+                        '--pitch', '0.0',
+                        '--yaw', '0.0',
+                        '--frame-id', 'base_link',
+                        '--child-frame-id', 'laser_frame',
+                    ],                    
+                    )
+
+    # 🚗 Drive Controller Node
+    # wenn man so in der Launch den Node deklariert.
+    # muss man innerhalb des Nodes die Parameter nicht vorher deklarieren
+    # sondern kann sie direkt auslesen.
+    # Nachteil ist ein Parameter nicht vorhanden, wird ein Fehler geloggt und der
+    # Node startet nicht
+    # Vorteil: deutlich einfacher innerhalb des Nodes
+
+    # def create_driver_controller_node(context):
+    #     return [
+    #         Node(
+    #             package='rover',
+    #             executable='driver_controller_node',
+    #             name='driver_controller_node',
+    #             output='screen',
+    #             parameters=[params_driver_controller_node]
+    #         )
+    #     ]
+
+    # 🧭 Navigation Node
+    navigation_node = Node(
+        package='rover',
+        executable='navigation_node',
+        name='navigation_node',
+        output='screen',
+        #parameters=[LaunchConfiguration('params_file')]
+        parameters=[params_navigation_node]
+    )
+
+    # LED Node
+    #
+    # wenn man so in der Launch den Node deklariert.
+    # muss man innerhalb des Nodes die Parameter vorher deklarieren
+    # erst dann kann man sie auslesen
+    # 
+    # Vorteil: sollte ein Parameter nicht vorhanden sein, kann man default werten arbeiten (sicherer)
+    # Nachteil: mehr Code im Node
+    led_node = Node(
+
+        package='rover',
+        executable='led_node',
+        name='led_node',
+        output='screen',
+        parameters=[params_led_node]
+    )
+
+    #--------------------------------------------------------------------------------------
+    # LifeCycle Nodes und Management
+    #--------------------------------------------------------------------------------------
+    lifecycle_node_definitions = GroupAction([
+        LogInfo(msg='[Launch] Starte LifecycleNodes...'),
+        LifecycleNode(
+            package='rover',
+            executable='sensor_node',
+            name='sensor_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_sensor_node]
+        ),
+        LifecycleNode(
+            package='rover',
+            executable='odom_node',
+            name='odom_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_odom_node]
+        ),
+        LifecycleNode(
+            package='rover',
+            executable='vision_node',
+            name='vision_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_vision_node]
+        ),
+        LifecycleNode(
+            package='rover',
+            executable='i2c_node',
+            name='i2c_node',
+            output='screen',
+            namespace='/',
+            parameters=[params_i2c_node]
+        ),
+    ])
+
+    lifecycle_status_marker_node = Node(
+        package='rover',
+        executable='lifecycle_status_marker',
+        name='lifecycle_status_marker',
+        output='screen'
+    )
+
+    #--------------------------------------------------------------------------------------
+
+
+    # 🕹️ Gamepad Steuerung über teleop_twist_joy
+    teleop_twist_joy_launch_path = os.path.join(
+        get_package_share_directory('teleop_twist_joy'),
+        'launch',
+        'teleop-launch.py'
+    )
+
+    gamepad_nodes = GroupAction([
+        LogInfo(msg='[Launch] Starte Gamepad Steuerung über teleop_twist_joy...'),
+        Node(
+            package='joy',
+            executable='joy_node',
+            name='joy_node',
+            output='screen'
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(teleop_twist_joy_launch_path),
+            launch_arguments={
+                'config': 'xbox'
+            }.items()
+        )
+    ])
+
+    # 📦 Gruppenbildung - 
+    core_nodes = GroupAction([
+        LogInfo(msg='[Launch] Starte Sensorik und Steuerung...'),
+        led_node,
+        tf2_world_node,
+        tf2_base_link_node,
+        gamepad_nodes
+    ])
+
+    nav_vision_nodes = GroupAction([
+        LogInfo(msg='[Launch] Starte Navigation und Vision...'),
+        navigation_node,
+    ])
+
+
+    # Lifecycle-Steuerung (Configure + Activate + Shutdown)
+    #
+    # Dieses verfahren habe ich gewählt, weil ich nav2_lifecycle_manager nicht zum Laufen gebracht habe
+    # die Transitionsübergänge haben nie automatisch funktioniert sondern immer nur manuell
+    # Das führte dazu, das beim Start des roverprojektes die LifeCycleNotes nie im active-State waren
+    #
+    # Nachfolgend eine einfacher manueller Ansatz der die Statusübergänge automatisiert.
+    base_delay = 3.0
+    step = 1.5
+    shutdown_step = 1.0
+    lifecycle_nodes_group = []
+
+    for idx, (node_name, executable, dependencies, param_file) in enumerate(lifecycle_nodes):
+        lifecycle_nodes_group.append(
+            LogInfo(msg=f"[Launch] ==> LifecycleNode {node_name} wird erstellt...")
+        )
+
+        lifecycle_nodes_group.append(
+            LifecycleNode(
+                package='rover',
+                executable=executable,
+                name=node_name,
+                namespace='/',
+                output='screen',
+                parameters=[param_file]
+            )
+        )
+
+        lifecycle_nodes_group.append(
+            LogInfo(msg=f"[Launch] ==> LifecycleNode {node_name} on_configure...")
+        )
+
+        # on_configure()
+        # Konfiguration aller Nodes zeitversetzt
+        lifecycle_nodes_group.append(
+            TimerAction(
+                period=base_delay + idx * step,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{node_name}', 'configure'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+
+        lifecycle_nodes_group.append(
+            LogInfo(msg=f"[Launch] ==> LifecycleNode {node_name} on_activate...")
+        )
+
+        # on_activate()
+        # Aktivierung, nachdem alle Abhängigkeiten geprüft wurden
+        lifecycle_nodes_group.append(
+            TimerAction(
+                period=base_delay + idx * step + 2.0 + len(dependencies) * 1.0,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['ros2', 'lifecycle', 'set', f'/{node_name}', 'activate'],
+                        output='screen'
+                    )
+                ]
+            )
+        )
+
+        lifecycle_nodes_group.append(
+            LogInfo(msg=f"[Launch] ==> LifecycleNode {node_name} wait on dependencies...")
+        )
+
+        # Warten auf alle Abhängigkeiten
+        for dep in dependencies:
+            lifecycle_nodes_group.append(
+                LogInfo(msg=f"[Launch] ==> Warte auf Dependency {dep} vor Aktivierung von {node_name}...")
+            )
+
+            lifecycle_nodes_group.append(
+                TimerAction(
+                    period=base_delay + idx * step + 1.0,
+                    actions=[
+                        ExecuteProcess(
+                            cmd=['python3', os.path.join(share_dir, 'scripts', 'wait_for_lifecycle.py'), dep],
+                            output='screen'
+                        )
+                    ]
+                )
+            )
+
+        
+    # --- END FOR ----------------------------------------------------------------------
+
+
+    # # EventHandler für OnShutdown
+    # lifecycle_shutdown_handler = RegisterEventHandler(
+    #     OnShutdown(on_shutdown=lifecycle_shutdown)
+    # )
+
+ 
+    # lifecycle_nodes_group = GroupAction([
+    #     LogInfo(msg='[Launch] Initialisiere Lifecycle-Aktionen...'),
+    #     lifecycle_status_marker_node,
+    #     *lifecycle_startup
+    # ])
+
+    # https://patorjk.com/software/taag/#p=display&f=Slant&t=ROVER%20PROJECT
+    # Font: SLANT, Fitted, default height
+    logo = r"""
+    ____   ____  _____ ___      ____   ____  _    __ ______ ____ 
+   / __ \ / __ \/ ___/|__ \    / __ \ / __ \| |  / // ____// __ \ 
+  / /_/ // / / /\__ \ __/ /   / /_/ // / / /| | / // __/  / /_/ /
+ / _, _// /_/ /___/ // __/   / _, _// /_/ / | |/ // /___ / _, _/ 
+/_/ |_| \____//____//____/  /_/ |_| \____/  |___//_____//_/ |_|  
+    ____                  _              __                      
+   / __ \ _____ ____     (_)___   _____ / /_                     
+  / /_/ // ___// __ \   / // _ \ / ___// __/                     
+ / ____// /   / /_/ /  / //  __// /__ / /_                       
+/_/    /_/    \____/__/ / \___/ \___/ \__/                       
+                   /___/                                         
+"""
+
+
+    # 🔁 Rückgabe der LaunchDescription
+    return LaunchDescription([
+        LogInfo(msg=[logo, '\n\n']),
+        lidar_model_arg,
+        rviz_load_arg,
+        params_file_arg,
+        OpaqueFunction(function=create_lidar_node),
+        core_nodes,
+        nav_vision_nodes,
+        *lifecycle_nodes_group,    
+        OpaqueFunction(function=create_nodes_from_arguments),
+    ])

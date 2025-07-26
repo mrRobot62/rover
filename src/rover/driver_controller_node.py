@@ -211,7 +211,12 @@ class DriverControllerNode(LifecycleNode):
         self.last_i2c_time = time.monotonic()
         self.min_interval = 0.05
 
-
+    #-------------------------------------------------------------------------------------------------------
+    #   🛠 on_configure()
+	#	Zweck:      Initialisierung des Nodes (z. B. Parameter laden, Publisher/Subscribers erstellen – aber noch nicht aktivieren).
+	#	Auslöser:   Übergang von unconfigured → inactive
+	#	Typisch:    Ressourcen vorbereiten, aber noch keine Kommunikation starten.
+    #-------------------------------------------------------------------------------------------------------
     def on_configure(self, state: State):
         self.get_logger().info("🚀  on_configure wurde betreten")
         self.get_logger().info(f'{self.node_name}: Konfiguriere...')
@@ -227,11 +232,17 @@ class DriverControllerNode(LifecycleNode):
         periode_s = 5.0
         self.test_periodically_timer_active = False
         self.get_logger().info(f"\t⏱️ create periodical GameController Messages")
-        self.create_timer(periode_s, self.test_periodically_send_service_messsage)
+        self.test_periodical_timer = self.create_timer(periode_s, self.test_periodically_send_service_messsage)
 
         self.get_logger().info("✅ on_configure ready")
         return TransitionCallbackReturn.SUCCESS
 
+    #-------------------------------------------------------------------------------------------------------
+    #   ✅ on_activate()
+	#	Zweck:      Aktivieren des Nodes – z. B. Publisher freischalten, Timer starten.
+	#	Auslöser:   Übergang von inactive → active
+	#	Typisch:    Start der eigentlichen Funktionalität.
+    #-------------------------------------------------------------------------------------------------------
     def on_activate(self, state: State):
         self.get_logger().info("🚀🚀  on_activate wurde betreten")
 
@@ -274,11 +285,23 @@ class DriverControllerNode(LifecycleNode):
         self.test_periodically_timer_active = True
         return TransitionCallbackReturn.SUCCESS
 
+    #-------------------------------------------------------------------------------------------------------
+    #   ⏸ on_deactivate()
+	#	Zweck:      Temporäres Pausieren – Publisher deaktivieren, aber Ressourcen behalten.
+    #	Auslöser:   Übergang von active → inactive
+    #	Typisch:    Nützlich für Systemwechsel oder geplante Pausen.
+    #-------------------------------------------------------------------------------------------------------
     def on_deactivate(self, state: State):
 
         self.get_logger().info(f'🧼🧼🧼 on_deactivate()')
         return super().on_deactivate(state)
 
+    #-------------------------------------------------------------------------------------------------------
+    #   ❌ on_shutdown()
+	#	Zweck:      Endgültiges Herunterfahren, z. B. bei ROS-Abbruch oder manuellem Stop.
+	#	Auslöser:   Übergang aus jedem Zustand → finalized
+	#	Typisch:    Letzte Aufräumarbeiten, Logging etc.
+    #-------------------------------------------------------------------------------------------------------
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         try:
             if rclpy.ok():
@@ -288,15 +311,59 @@ class DriverControllerNode(LifecycleNode):
             import traceback
             self.get_logger().error(traceback.format_exc())    
 
+        self._destroy_resources()
+
         self.get_logger().info(f'[{self.node_name}] Shutdown erfolgreich abgeschlossen.')
  
         self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
  
         return super().on_shutdown(state)
-    
+
+    #-------------------------------------------------------------------------------------------------------
+	#   🔁 on_cleanup()
+    #	Zweck: Aufräumen aller Ressourcen, Rücksetzen in den Ursprungszustand.
+	#	Auslöser: Übergang von inactive → unconfigured
+	#	Typisch: Alles schließen, als ob der Node frisch gestartet wurde.    
+    #-------------------------------------------------------------------------------------------------------
+
+
+    #-------------------------------------------------------------------------------------------------------
+    # ⚠️ on_error()
+	#	Zweck: Fehlerbehandlung bei fehlgeschlagenem Übergang.
+	#	Auslöser: Fehler in anderen Transitions (z. B. on_activate schlägt fehl)
+	#	Typisch: Logging, Ressourcenfreigabe, ggf. Rückkehr in sicheren Zustand.    
+    #-------------------------------------------------------------------------------------------------------
+
+
+    def _destroy_resources(self):
+        self.get_logger().info(f"[_destroy_resources] Node sauber runter fahren")
+        if self.publisher is not None:
+            self.destroy_publisher(self.publisher)
+        if self.led_pub is not None:
+            self.destroy_publisher(self.led_pub)
+        if self.esp32client is not None:
+            self.esp32client.shutdown()
+            self.esp32client = None
+        if self.subscription is not None:
+            self.destroy_subscription(self.subscription)
+        if self.test_periodical_timer is not None:
+            self.destroy_timer(self.test_periodical_timer)
+
+
     def publish_led_pattern(self, pattern_id: int, timeout: int = 0, duration_on: int = 0, duration_off: int = 0, ledmask: int = 0x0fffffff):
         """
+        Das gewünsche LEDPattern publizieren.
+
+        Wichtig:
+        Topic-Messages haben seitens Ros immer einen Default wert, bei Interger & Float ist das 0 bzw. 0.0, bei Strings ist das ''
+        Sendet man nun aber im Timeout=0 an den LEDNode, geht der Node davon aus, das es keinen Timeout geben soll und überschreibt den
+        eigentlichen Default-Wert des Patterns. Das Ergebnis ist, das das Pattern anders reagiert als gedacht. Gleiches gitlt für duration_on/_off usw.
+
+        Daher ist es wichtig das das die werte auf -1 gesetzt werden. der LEDNode prüft auf diesen Wert und wenn er vorhanden ist, wird dieser Wert ignoriert
+        und mit dem DefaultWert überschrieben.
+
+        Somit ist es explizit möglich, das ein Publisher entweder mit Default-Werten arbeiten kann und sie mit neuen Werten überschreibt.
         """
         msg = LEDMessage()
         msg.pattern = pattern_id
@@ -327,40 +394,40 @@ class DriverControllerNode(LifecycleNode):
             if rb_button and lb_button:
                 self.publish_led_pattern(
                     pattern_id=LEDPattern.OFF.value,
-                    timeout=-1,
-                    duration_on=-1, 
-                    duration_off=-1,
-                    ledmask = 0
+                    timeout=-1,             # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_on=-1,         # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_off=-1,        # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    ledmask = 0             # 0 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
                 )
                 self.publish_led_pattern(
                     pattern_id=LEDPattern.HAZARD.value,
-                    timeout=-1,
-                    duration_on=-1, 
-                    duration_off=-1,
-                    ledmask = 0
+                    timeout=-1,             # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_on=-1,         # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_off=-1,        # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    ledmask = 0             # 0 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
                 )
             else:
                 #
                 # Links blinken
                 if lb_button and not self.last_buttons[BUTTONS.LB.value]:
                     self.publish_led_pattern(
-                        pattern_id=LEDPattern.BLINK_LEFT.value,
-                        timeout=-1,
-                        duration_on=-1,
-                        duration_off=-1,
-                        ledmask=0
-                    )
+                    pattern_id=LEDPattern.BLINK_LEFT.value,
+                    timeout=-1,             # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_on=-1,         # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_off=-1,        # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    ledmask = 0             # 0 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                )
 
                 #
                 # Rechts blinken
                 if rb_button and not self.last_buttons[BUTTONS.RB.value]:
                     self.publish_led_pattern(
-                        pattern_id=LEDPattern.BLINK_RIGHT.value, 
-                        timeout=-1,
-                        duration_on=-1, 
-                        duration_off=-1,
-                        ledmask=0
-                    )
+                    pattern_id=LEDPattern.BLINK_RIGHT.value, 
+                    timeout=-1,             # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_on=-1,         # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    duration_off=-1,        # -1 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                    ledmask = 0             # 0 muss explizit gesetzt werden, wenn man default werte NICHT überschreiben möchte
+                )
 
 
         if x_button and b_button:

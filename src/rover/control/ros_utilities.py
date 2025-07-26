@@ -88,7 +88,7 @@ class Ros2Delay:
         """Gibt zurück, ob ein Delay läuft."""
         return self._timer is not None
 
-""""
+"""
 Beispiel zur Nutzung in einem LifeCycleNode
 
 class DelayedLifecycleNode(LifecycleNode):
@@ -131,4 +131,4 @@ def main(args=None):
     node = DelayedLifecycleNode()
     rclpy.spin(node)
     rclpy.shutdown()
-""""
+"""

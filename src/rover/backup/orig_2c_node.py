@@ -8,12 +8,12 @@ from lifecycle_msgs.srv import GetState
 from rover_interfaces.msg import I2CWrite, I2CRead, BatteryRaw  # angenommenes Msg-Format
 from rover_interfaces.srv import I2CESP32Communication, I2CReadRequest
 
-from .control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS, SERVICE_RESPONSE, ESP32_RESPONSE
-from .control.utilities import Utilities
-from .control.ros_utilities import *
-from .hardware.ads1115_driver import ADS1115Driver
-from .hardware.acs712_driver import ACS712Driver
-from .hardware.i2c_driver import I2CBus
+from ..control.ESP32CommandsV1 import CommandID, SubCommandID, ESP32PINS, SERVICE_RESPONSE, ESP32_RESPONSE
+from ..control.utilities import Utilities
+from ..control.ros_utilities import *
+from ..hardware.ads1115_driver import ADS1115Driver
+from ..hardware.acs712_driver import ACS712Driver
+from ..hardware.i2c_driver import I2CBus
 import struct
 import os
 import asyncio

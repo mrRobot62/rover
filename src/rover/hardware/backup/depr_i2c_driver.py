@@ -28,7 +28,7 @@ from enum import Enum
 import struct
 from typing import List
 
-from ..control.ESP32CommandsV1 import *
+from ...control.ESP32CommandsV1 import *
 
 # Konstanten zur Bus- und Adresskonfiguration
 I2C_BUS = "/dev/i2c-"      # Pfad zum I2C-Device auf Linux

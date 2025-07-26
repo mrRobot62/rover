@@ -40,7 +40,7 @@ def generate_launch_description():
     params_common = os.path.join(share_dir, 'config', 'rover_common.yaml')
 
 
-    # Liste der Lifecycle-Nodes (name, executable)
+    # Liste der Lifecycle-Nodes (name, executable, dependencies, parameter-file)
     lifecycle_nodes = [
         ('i2c_node', 'i2c_node', [], params_i2c_node),
         ('driver_controller_node', 'driver_controller_node', ['i2c_node'], params_driver_controller_node),
@@ -61,18 +61,6 @@ def generate_launch_description():
 
     lidar_model = LaunchConfiguration('lidar_model')
     lidar_topic = LaunchConfiguration('lidar_topic', default='/scan')
-
-    # sensor_node = LifecycleNode(
-    #     package='rover',
-    #     executable='sensor_node',
-    #     name='sensor_node',
-    #     output='screen',
-    #     namespace='/',
-    #     parameters=[
-    #         LaunchConfiguration('params_se'),
-    #         {'lidar_topic': lidar_topic}
-    #     ]
-    # )
 
     # wird nur dann benötigt, wenn ich direkt ein Node erstellen möchte
     #lidar_model = LaunchConfiguration('lidar_model')
@@ -193,24 +181,6 @@ def generate_launch_description():
                     ],                    
                     )
 
-    # 🚗 Drive Controller Node
-    # wenn man so in der Launch den Node deklariert.
-    # muss man innerhalb des Nodes die Parameter nicht vorher deklarieren
-    # sondern kann sie direkt auslesen.
-    # Nachteil ist ein Parameter nicht vorhanden, wird ein Fehler geloggt und der
-    # Node startet nicht
-    # Vorteil: deutlich einfacher innerhalb des Nodes
-
-    # def create_driver_controller_node(context):
-    #     return [
-    #         Node(
-    #             package='rover',
-    #             executable='driver_controller_node',
-    #             name='driver_controller_node',
-    #             output='screen',
-    #             parameters=[params_driver_controller_node]
-    #         )
-    #     ]
 
     # 🧭 Navigation Node
     navigation_node = Node(

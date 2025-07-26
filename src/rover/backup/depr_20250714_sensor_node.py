@@ -13,9 +13,9 @@ from sensor_msgs.msg import Imu
 
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import State
-from .sensors.lidar_sensor import LidarSensor
-from .sensors.depr_battery_sensor import BatterySensor, BatteryStatus, PowerStatus
-from .control.led_pattern import LEDPattern
+from ..sensors.lidar_sensor import LidarSensor
+from ..sensors.depr_battery_sensor import BatterySensor, BatteryStatus, PowerStatus
+from ..control.led_pattern import LEDPattern
 
 from rover_interfaces.msg import Battery, LEDMessage
 from rclpy.callback_groups import ReentrantCallbackGroup

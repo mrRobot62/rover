@@ -145,6 +145,13 @@ class I2CNode(LifecycleNode):
         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
 
 
+
+    #-------------------------------------------------------------------------------------------------------
+    #   🛠 on_configure()
+	#	Zweck:      Initialisierung des Nodes (z. B. Parameter laden, Publisher/Subscribers erstellen – aber noch nicht aktivieren).
+	#	Auslöser:   Übergang von unconfigured → inactive
+	#	Typisch:    Ressourcen vorbereiten, aber noch keine Kommunikation starten.
+    #-------------------------------------------------------------------------------------------------------
     def on_configure(self, state: State):
         # Subscriber für WRITE-Befehle
         self.get_logger().info("🚀 on_configure wurde betreten")
@@ -229,6 +236,13 @@ class I2CNode(LifecycleNode):
             return TransitionCallbackReturn.FAILURE
 
 
+
+    #-------------------------------------------------------------------------------------------------------
+    #   ✅ on_activate()
+	#	Zweck:      Aktivieren des Nodes – z. B. Publisher freischalten, Timer starten.
+	#	Auslöser:   Übergang von inactive → active
+	#	Typisch:    Start der eigentlichen Funktionalität.
+    #-------------------------------------------------------------------------------------------------------
     def on_activate(self, state):
         self.get_logger().info("🚀🚀 on_activate wurde betreten")
         self._current_state = State.PRIMARY_STATE_ACTIVE
@@ -279,7 +293,7 @@ class I2CNode(LifecycleNode):
             self.ads1115_period_s = 1.0 / self.ads1115_sample_rate_hz
             self.get_logger().info(f'\t\tADS1115 Publisher alle {self.ads1115_period_s:.3f} Sekunden → Topic: {self.i2c_ads_raw_topic}')
             self.pub_batt = self.create_publisher(BatteryRaw, self.i2c_ads_raw_topic, 10)
-            self.create_timer(self.ads1115_period_s, self.read_ads1115_periodically)
+            self.ads1115_timer = self.create_timer(self.ads1115_period_s, self.read_ads1115_periodically)
 
             #
             # IMU Publisher konfigurieren
@@ -293,6 +307,13 @@ class I2CNode(LifecycleNode):
             self.get_logger().error(traceback.format_exc())  
             return TransitionCallbackReturn.FAILURE
 
+
+    #-------------------------------------------------------------------------------------------------------
+    #   ⏸ on_deactivate()
+	#	Zweck:      Temporäres Pausieren – Publisher deaktivieren, aber Ressourcen behalten.
+    #	Auslöser:   Übergang von active → inactive
+    #	Typisch:    Nützlich für Systemwechsel oder geplante Pausen.
+    #-------------------------------------------------------------------------------------------------------
     def on_deactivate(self, state: State):
         self.get_logger().info(f'🧼🧼🧼 on_deactivate()')
         try:
@@ -313,6 +334,13 @@ class I2CNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
+
+    #-------------------------------------------------------------------------------------------------------
+    #   ❌ on_shutdown()
+	#	Zweck:      Endgültiges Herunterfahren, z. B. bei ROS-Abbruch oder manuellem Stop.
+	#	Auslöser:   Übergang aus jedem Zustand → finalized
+	#	Typisch:    Letzte Aufräumarbeiten, Logging etc.
+    #-------------------------------------------------------------------------------------------------------
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         try:
             if rclpy.ok():
@@ -322,12 +350,79 @@ class I2CNode(LifecycleNode):
             import traceback
             self.get_logger().error(traceback.format_exc())    
 
+        self._destroy_resources()
         self.get_logger().info(f'[{self.node_name}] Shutdown erfolgreich abgeschlossen.')
  
         self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
         self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
  
         return super().on_shutdown(state)
+
+
+    #-------------------------------------------------------------------------------------------------------
+	#   🔁 on_cleanup()
+    #	Zweck: Aufräumen aller Ressourcen, Rücksetzen in den Ursprungszustand.
+	#	Auslöser: Übergang von inactive → unconfigured
+	#	Typisch: Alles schließen, als ob der Node frisch gestartet wurde.    
+    #-------------------------------------------------------------------------------------------------------
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        try:
+            if rclpy.ok():
+                self.get_logger().info(f"🔁🔁🔁🔁 [{self.node_name}] on_shutdown")
+        except Exception as e:
+            self.get_logger().error(f'❌❌❌❌❌❌[{self.node_name}] Fehler in on_shutdown(): {e}❌❌❌❌❌❌')
+            import traceback
+            self.get_logger().error(traceback.format_exc())    
+
+        self._destroy_resources()
+
+        self.get_logger().info(f'[{self.node_name}] Cleanup erfolgreich abgeschlossen.')
+ 
+        self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
+        self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+ 
+        return super().on_cleanup(state)
+
+
+    #-------------------------------------------------------------------------------------------------------
+    # ⚠️ on_error()
+	#	Zweck: Fehlerbehandlung bei fehlgeschlagenem Übergang.
+	#	Auslöser: Fehler in anderen Transitions (z. B. on_activate schlägt fehl)
+	#	Typisch: Logging, Ressourcenfreigabe, ggf. Rückkehr in sicheren Zustand.    
+    #-------------------------------------------------------------------------------------------------------
+    def on_error(self, state: State) -> TransitionCallbackReturn:
+        try:
+            if rclpy.ok():
+                self.get_logger().info(f"❌ [{self.node_name}] on_error ❌ ")
+        except Exception as e:
+            self.get_logger().error(f'❌❌❌❌❌❌[{self.node_name}] Fehler in on_error(): {e}❌❌❌❌❌❌')
+            import traceback
+            self.get_logger().error(traceback.format_exc())    
+
+        self._destroy_resources()
+        return super().on_error(state)
+
+
+    def _destroy_resources(self):
+        self.get_logger().info(f"[_destroy_resources] alle Ressourcen zerstören...")
+        #---- Destroy Services --------------------------
+        if self.esp32_communication_service is not None:
+            self.destroy_service(self.esp32_communication_service)
+        if self.esp32_read_service is not None:
+            self.destroy_service(self.esp32_read_service)
+        #---- Destroy Timer --------------------------
+        if self.ads1115_timer is not None:
+            self.destroy_timer(self.ads1115_timer)
+        #---- Destroy Subscriber --------------------------
+        #---- Destroy Publisher--------------------------
+        if self.pub_batt is not None:
+            self.destroy_publisher(self.pub_batt)
+        #---- Other --------------------------
+        self.ads = None
+        self.acs712 = None
+        self.bus.close()
+        self.bus = None
+
 
     def handle_write_msg(self, msg: I2CWrite):
         """

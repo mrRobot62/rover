@@ -199,9 +199,6 @@ class DriverControllerNode(LifecycleNode):
         map_js_cam_turn:        {self.map_js_cam_turn}
         map_js_cam_tilt:        {self.map_js_cam_tilt}
         """)
-
-
-
         self.last_velocity = None
         self.last_steering = None
         self.last_axes = None
@@ -218,6 +215,7 @@ class DriverControllerNode(LifecycleNode):
 	#	Typisch:    Ressourcen vorbereiten, aber noch keine Kommunikation starten.
     #-------------------------------------------------------------------------------------------------------
     def on_configure(self, state: State):
+        self.node_active = False
         self.get_logger().info("🚀  on_configure wurde betreten")
         self.get_logger().info(f'{self.node_name}: Konfiguriere...')
         #return super().on_configure(state)
@@ -245,6 +243,7 @@ class DriverControllerNode(LifecycleNode):
     #-------------------------------------------------------------------------------------------------------
     def on_activate(self, state: State):
         self.get_logger().info("🚀🚀  on_activate wurde betreten")
+        self.node_active = True
 
         try:
             #
@@ -276,7 +275,6 @@ class DriverControllerNode(LifecycleNode):
                 10
             )
 
-
         except RoverException as err:
             raise RoverException()
 
@@ -292,7 +290,7 @@ class DriverControllerNode(LifecycleNode):
     #	Typisch:    Nützlich für Systemwechsel oder geplante Pausen.
     #-------------------------------------------------------------------------------------------------------
     def on_deactivate(self, state: State):
-
+        self.node_active = False
         self.get_logger().info(f'🧼🧼🧼 on_deactivate()')
         return super().on_deactivate(state)
 
@@ -326,6 +324,23 @@ class DriverControllerNode(LifecycleNode):
 	#	Auslöser: Übergang von inactive → unconfigured
 	#	Typisch: Alles schließen, als ob der Node frisch gestartet wurde.    
     #-------------------------------------------------------------------------------------------------------
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        try:
+            if rclpy.ok():
+                self.get_logger().info(f"🔁🔁🔁🔁 [{self.node_name}] on_shutdown")
+        except Exception as e:
+            self.get_logger().error(f'❌❌❌❌❌❌[{self.node_name}] Fehler in on_shutdown(): {e}❌❌❌❌❌❌')
+            import traceback
+            self.get_logger().error(traceback.format_exc())    
+
+        self._destroy_resources()
+
+        self.get_logger().info(f'[{self.node_name}] Cleanup erfolgreich abgeschlossen.')
+ 
+        self._current_state = LifecycleState.PRIMARY_STATE_INACTIVE
+        self.get_logger().info(f"[{self.node_name}] Node im Status '{LIFECYCLE_STATE_LABELS[self._current_state]}'")
+ 
+        return super().on_cleanup(state)
 
 
     #-------------------------------------------------------------------------------------------------------
@@ -334,10 +349,21 @@ class DriverControllerNode(LifecycleNode):
 	#	Auslöser: Fehler in anderen Transitions (z. B. on_activate schlägt fehl)
 	#	Typisch: Logging, Ressourcenfreigabe, ggf. Rückkehr in sicheren Zustand.    
     #-------------------------------------------------------------------------------------------------------
+    def on_error(self, state: State) -> TransitionCallbackReturn:
+        try:
+            if rclpy.ok():
+                self.get_logger().info(f"❌ [{self.node_name}] on_error ❌ ")
+        except Exception as e:
+            self.get_logger().error(f'❌❌❌❌❌❌[{self.node_name}] Fehler in on_error(): {e}❌❌❌❌❌❌')
+            import traceback
+            self.get_logger().error(traceback.format_exc())    
+
+        self._destroy_resources()
+        return super().on_error(state)
 
 
     def _destroy_resources(self):
-        self.get_logger().info(f"[_destroy_resources] Node sauber runter fahren")
+        self.get_logger().info(f"[_destroy_resources] alle Ressourcen zerstören...")
         if self.publisher is not None:
             self.destroy_publisher(self.publisher)
         if self.led_pub is not None:
@@ -365,6 +391,8 @@ class DriverControllerNode(LifecycleNode):
 
         Somit ist es explizit möglich, das ein Publisher entweder mit Default-Werten arbeiten kann und sie mit neuen Werten überschreibt.
         """
+        if not self.node_active:
+            return 
         msg = LEDMessage()
         msg.pattern = pattern_id
         msg.ledtype = "WS2812"
@@ -377,6 +405,9 @@ class DriverControllerNode(LifecycleNode):
 
 
     def cmd_driver_callback(self, msg: Joy):
+        if not self.node_active:
+            return 
+
         axes = msg.axes.tolist()
         axes = [round(x, 3) for x in msg.axes]
         buttons = msg.buttons.tolist()
@@ -470,6 +501,9 @@ class DriverControllerNode(LifecycleNode):
         sende periodisch über /i2c/esp32_command eine Nachricht und simulliert
         einen GameController Eingabe
         """
+        if not self.node_active:
+            return 
+        
         if not self.test_periodically_timer_active :
             return 
         steering = Utilities.random_step_value(-1.0, 1.0, 5, 5)

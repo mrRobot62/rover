@@ -19,6 +19,7 @@ import os
 import asyncio
 import threading
 import time
+from smbus2 import i2c_msg
 
 """
     I2C Node
@@ -471,8 +472,8 @@ class I2CNode(LifecycleNode):
             self.get_logger().info(f"📡 handle_esp32_command '{request}'")
             if request.command == CommandID.SERVO_WRITE.value:
                 if request.subcommand == SubCommandID.SCMD_SERVO_SPEED_POSITION.value:
-                    steering = request.fvalues[0]
-                    velocity = request.fvalues[1]
+                    steering = request.fvalues[1]
+                    velocity = request.fvalues[0]
                     steering = Utilities.clamp(steering, -1.0, +1.0)
                     velocity = Utilities.clamp(velocity, -1.0, +1.0)
                     #
@@ -555,9 +556,11 @@ class I2CNode(LifecycleNode):
 
             # Umwandeln in Liste von ints für write_i2c_block_data
             packet_list = list(packet)
-            self.bus.write_i2c_block_data(slave_address, 0x00, packet_list)
+            #self.bus.write_i2c_block_data(slave_address, 0x00, packet_list)
+            msg = i2c_msg.write(slave_address, packet_list)  # Nur 17 Bytes, kein command-Byte
+            self.bus.i2c_rdwr(msg)
             self.get_logger().debug(f"[__send_esp32_packet] : {packet_list}")
-            self.get_logger().info(f"[__send_esp32_packet] write_i2c_block_data done")
+            self.get_logger().info(f"[__send_esp32_packet] write_i2c_block_data done. Size: {len(packet_list)}")
             response.ivalues = [0]
             response.fvalues = []
         except Exception as e:

@@ -49,7 +49,7 @@ class ESP32Client:
         request.device = "ESP32"
         request.command = CommandID.SERVO_WRITE.value
         request.subcommand = SubCommandID.SCMD_SERVO_SPEED_POSITION.value
-        request.fvalues = [steering, velocity]
+        request.fvalues = [velocity, steering]
         request.ivalues = []
 
         future = self.client.call_async(request)

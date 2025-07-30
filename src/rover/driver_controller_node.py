@@ -160,6 +160,7 @@ class DriverControllerNode(LifecycleNode):
             ('map_js_cam_turn', 2),
             ('map_js_cam_tilt', 3),
             ('service_wait_timeout', 10.0),
+            ('test_periodically_timer_active', False),
 
 
         ])
@@ -179,6 +180,7 @@ class DriverControllerNode(LifecycleNode):
         self.map_js_cam_tilt = self.get_parameter('map_js_cam_tilt').get_parameter_value().integer_value
         self.service_wait_timeout = self.get_parameter('service_wait_timeout').get_parameter_value().double_value
 
+        self.test_periodically_timer_active  = self.get_parameter('reverse_steering').get_parameter_value().bool_value
 
         self.get_logger().info(
         f"""
@@ -229,8 +231,9 @@ class DriverControllerNode(LifecycleNode):
 
         periode_s = 5.0
         self.test_periodically_timer_active = False
-        self.get_logger().info(f"\t⏱️ create periodical GameController Messages")
-        self.test_periodical_timer = self.create_timer(periode_s, self.test_periodically_send_service_messsage)
+        if self.test_periodically_timer_active:
+            self.get_logger().info(f"\t⏱️ create periodical GameController Messages")
+            self.test_periodical_timer = self.create_timer(periode_s, self.test_periodically_send_service_messsage)
 
         self.get_logger().info("✅ on_configure ready")
         return TransitionCallbackReturn.SUCCESS
@@ -475,8 +478,8 @@ class DriverControllerNode(LifecycleNode):
 
         if self.MODE == "MANUAL":
             #self.get_logger().info(f"MANUAL-MODE......")            
-            velocity = axes[self.js_velocity]
-            steering = axes[self.js_steering]
+            velocity = axes[self.map_js_velocity]
+            steering = axes[self.map_js_steering]
             now = time.monotonic()
             #
             # Nur dann Daten versenden, wenn sich zwischen jetzt und letzter Übertragung etwas geändert hat

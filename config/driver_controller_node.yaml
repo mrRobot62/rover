@@ -4,6 +4,9 @@
 driver_controller_node:
   ros__parameters:
     log_level: DEBUG
+    # nur für Testzwecke ohne Gamepad-Controller
+    # wenn true, wird periodisch eine "Gamepad-Nachricht" generiert (alle 5s)
+    test_periodically_timer_active: false
 
     cmd_vel_topic: "/joy"
     reverse_steering: false
@@ -13,7 +16,7 @@ driver_controller_node:
     # LJ_LR = 0, LJ_UD = 1
     # RJ_LR = 2, RJ_UD = 3
     # PAD_LR = 4, PAD_UD = 5
-    map_js_steering: 0     # LJ_LR (Wert aus ENUM JOYSTICKS)
+    map_js_steering: 2     # LJ_LR (Wert aus ENUM JOYSTICKS)
     map_js_velocity: 1     # LJ_UD
-    map_js_cam_turn: 2     # RJ_LR
+    map_js_cam_turn: 0     # RJ_LR
     map_js_cam_tilt: 3     # RJ_UD

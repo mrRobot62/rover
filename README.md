@@ -9,6 +9,7 @@ Akuell arbeiten wir getrennt mit zwei Rover die beide zwar auf ROS2 basieren abe
 ## Historie
 | Version |   Datum    | Inhalt                                                                                                       |
 | :-----: | :--------: | ------------------------------------------------------------------------------------------------------------ |
+|   0.2   | 2025-07-31 | Einführung LiveCycleNodes, I2C_Node für gekapselten I2C-Zugriff, Trennung Config files pro Node |
 |   0.1   | 2025-06-22 | initialer upload, Rover fährt grundlegene ROS2 Struktur funktioniert, ESP32 FW ok, Gamepad F710 ok, LIDAR ok |
 |         |            |                                                                                                              |
 

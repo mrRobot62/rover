@@ -1,0 +1,14 @@
+# ------------------------------------------------------
+# Obstacle Avoidance Node spezifische Konfigurationen
+# ------------------------------------------------------
+obstacle_avoidance_node:
+  ros__parameters:
+    log_level: INFO
+
+    #cmd_vel_topic: '/joy'      # wird in rover_common definiert
+    scan_topic: 'auto_cmd_vel'  # 
+    angle_front: 45.0           # Überwachungswinkel vorne
+    obstacle_distance: 0.5      # Hindernisse <50cm werden überwacht
+    forward_speed: 0.2          # Langsames heranfahren
+    turn_speed. 0.4             # Drehgeschwindigkeit beim Ausweichen
+    

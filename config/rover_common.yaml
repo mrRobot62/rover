@@ -5,7 +5,8 @@ common_topics:
     topic_battery: '/battery'
     topic_battery_raw: '/battery/ads_raw'
     topic_imu: '/imu'
-    
+    cmd_vel_topic: "/joy"
+
     # subscribe einen Befehl der an einen Slave gesendet wird (Write)
     # Möglichkeit 1
     i2c_write_topic: "/i2c/write"
